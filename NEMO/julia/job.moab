@@ -1,0 +1,11 @@
+#!/bin/bash
+#MOAB -N ANALYSISRATE
+#MOAB -l nodes=5:ppn=20
+#MOAB -l walltime=01:00:00:00
+#MOAB -l mem=50Gb
+
+WSDIR=$(ws_find engram2)
+
+module load neuro/nest/2.20.0
+
+mpirun python $WSDIR/0_familiarity_large.py 200

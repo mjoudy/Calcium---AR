@@ -1,0 +1,9 @@
+#!/bin/bash
+#MOAB -N regularization
+#MOAB -l nodes=1:ppn=20
+#MOAB -l walltime=01:00:00:00
+#MOAB -l mem=256Gb
+
+WSDIR=$(ws_find lasso_reg-0)
+
+python regularization.py
