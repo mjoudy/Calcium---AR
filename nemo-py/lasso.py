@@ -23,7 +23,7 @@ Y_prime = signal[:, :-k]
 
 yk = Y.T
 y_k = Y_prime.T
-las = Lasso(alpha=0.00375)
+las = Lasso(alpha=0.00375).fit(y_k, yk)
 A = las.coef_
 
 G = np.load('connectivity-10e5-ms.npy')
