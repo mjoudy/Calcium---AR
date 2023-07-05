@@ -18,7 +18,7 @@ def sim_calcium(spikes, tau=100, neuron_id=500):
     #N = np.shape(spikes)[0]
     wup_time = 1000
     spikes = spikes[neuron_id, wup_time:]
-    sim_dur = np.shape(spikes)[1]
+    sim_dur = np.shape(spikes)[0]
 
     noise_intra = np.random.normal(0, 0.01, sim_dur)
     spikes_noisy = spikes + noise_intra
@@ -128,7 +128,10 @@ def ransac_outlier(signal, deriv, plot=False):
     return ransac.estimator_.coef_[0]
 
 
-def zscore_outlier(signal, deriv, threshold, plot=False):
+def zscore_outlier(signal, deriv, threshold=2, plot=False):
+
+    x = np.array(signal)
+    y = np.array(deriv)
     z_scores_x = (signal - np.mean(signal)) / np.std(signal)
     z_scores_y = (deriv - np.mean(deriv)) / np.std(deriv)
     mask = np.abs(z_scores_x) < threshold
@@ -137,8 +140,13 @@ def zscore_outlier(signal, deriv, threshold, plot=False):
     b_zscore, a_zscore = np.polyfit(x[mask], y[mask], deg=1)
 
     if plot==True:
+        i_mask=np.logical_not(mask)
         fig, ax = plt.subplots()
-        plt.scatter()
+        plt.scatter(x[mask], y[mask], marker='.', s=5)
+        plt.scatter(x[i_mask], y[i_mask], marker='.', s=5,color='red')
+        plt.plot(x[mask], a_zscore+b_zscore*x[mask], color='k')
+
+    return b_zscore
 
 
 
