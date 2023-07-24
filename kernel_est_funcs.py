@@ -64,6 +64,7 @@ def smoothed_signals(signal, win_len, do_plots=False):
         ax2.plot(negetive_cal)
         ax2.plot(30*negetive_deriv)
 
+    #return smooth_cal, smooth_deriv
     return negetive_cal, negetive_deriv
 
 def scatter_all(signal, win_len):
@@ -96,7 +97,7 @@ def iqr_outlier(signal, deriv, threshold=1.5, do_plot=False):
     y = np.array(deriv)
 
     residuals = y - np.polyval(np.polyfit(x, y, 1), x)
-    quartile_1, quartile_3 = np.percentile(residuals, [25, 75])
+    quartile_1, quartile_3 = np.percentile(residuals, [5, 55])
     iqr = quartile_3 - quartile_1
     lower_bound = quartile_1 - (threshold * iqr)
     upper_bound = quartile_3 + (threshold * iqr)
