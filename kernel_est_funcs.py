@@ -50,7 +50,7 @@ def sim_calcium(spikes, tau=100, neuron_id=500):
     return calcium_nsp_noisy
 
 
-def smoothed_signals(signal, win_len, do_plots=False):
+def smoothed_signals(signal, win_len, neg=False, do_plots=False):
     smooth_cal = sig.savgol_filter(signal, window_length=win_len, deriv=0, delta=1., polyorder=3)
     smooth_deriv = sig.savgol_filter(signal, window_length=win_len, deriv=1, delta=1., polyorder=3)
 
@@ -58,14 +58,17 @@ def smoothed_signals(signal, win_len, do_plots=False):
     negetive_deriv = smooth_deriv[smooth_deriv < 0]
 
     if do_plots==True:
-        fig, ax1, ax2 = plt.subplots(2,1,figsize=(20,8))
+        fig, (ax1, ax2) = plt.subplots(2,1,figsize=(20,8))
         ax1.plot(smooth_cal)
         ax1.plot(30*smooth_deriv)
         ax2.plot(negetive_cal)
         ax2.plot(30*negetive_deriv)
 
-    #return smooth_cal, smooth_deriv
-    return negetive_cal, negetive_deriv
+    if neg == True:
+        return negetive_cal, negetive_deriv
+    else:
+        return smooth_cal, smooth_deriv
+    
 
 def scatter_all(signal, win_len):
     smooth_cal = sig.savgol_filter(signal, window_length=win_len, deriv=0, delta=1., polyorder=3)
@@ -91,13 +94,13 @@ def pure_fit(signal, deriv, do_plot=False):
     return b_pure_fit
 
 
-def iqr_outlier(signal, deriv, threshold=1.5, do_plot=False):
+def iqr_outlier(signal, deriv, threshold=1.5, percentile_start=25, percentile_end=75,  do_plot=False):
     
     x = np.array(signal)
     y = np.array(deriv)
 
     residuals = y - np.polyval(np.polyfit(x, y, 1), x)
-    quartile_1, quartile_3 = np.percentile(residuals, [5, 55])
+    quartile_1, quartile_3 = np.percentile(residuals, [percentile_start, percentile_end])
     iqr = quartile_3 - quartile_1
     lower_bound = quartile_1 - (threshold * iqr)
     upper_bound = quartile_3 + (threshold * iqr)
