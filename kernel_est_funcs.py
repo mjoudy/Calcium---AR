@@ -68,7 +68,23 @@ def smoothed_signals(signal, win_len, neg=False, do_plots=False):
         return negetive_cal, negetive_deriv
     else:
         return smooth_cal, smooth_deriv
-    
+
+
+def cut_spikes(spikes, signal, deriv, win_len=5):
+    event_spikes = np.where(spikes == 1)[0]
+
+    remove_index = []
+    for i in event_spikes:
+            remove_index.append(np.arange(i-5, i+5))
+    remove_index = np.array(remove_index)
+
+    signal = np.delete(signal, remove_index)
+    deriv = np.delete(deriv, remove_index)
+
+    return signal, deriv
+
+
+##### outlier removal functions
 
 def scatter_all(signal, win_len):
     smooth_cal = sig.savgol_filter(signal, window_length=win_len, deriv=0, delta=1., polyorder=3)
