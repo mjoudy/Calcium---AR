@@ -75,8 +75,10 @@ def cut_spikes(spikes, signal, deriv, win_len=5):
 
     remove_index = []
     for i in event_spikes:
-            remove_index.append(np.arange(i-5, i+5))
+        remove_index.append(np.arange(i-5, i+5))
     remove_index = np.array(remove_index)
+    remove_index = remove_index.flatten()
+    remove_index = remove_index[remove_index>0]
 
     signal = np.delete(signal, remove_index)
     deriv = np.delete(deriv, remove_index)
