@@ -71,11 +71,18 @@ def smoothed_signals(signal, win_len, neg=False, do_plots=False):
 
 
 def cut_spikes(spikes, signal, deriv, win_len=5):
-    event_spikes = np.where(spikes == 1)[0]
+    
+    bool_check = all(element==0 or element==1 for element in spikes)
+
+    if bool_check:
+        spikes = np.where(spikes)[0]
+    else:
+        spikes = spikes.astype(int)
 
     remove_index = []
-    for i in event_spikes:
-        remove_index.append(np.arange(i-5, i+5))
+    for i in spikes:
+        remove_index.append(np.arange(i-win_len, i+win_len))
+        #add a line to include cut spikes
     remove_index = np.array(remove_index)
     remove_index = remove_index.flatten()
     remove_index = remove_index[remove_index>0]
