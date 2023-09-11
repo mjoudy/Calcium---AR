@@ -72,7 +72,7 @@ def sim_calcium(spikes, tau=100, neuron_id=500):
         calcium_nsp_noisy = calcium_nsp + noise_recording
 
     #return calcium, calcium_noisy, calcium_nsp, calcium_nsp_noisy
-    return calcium_nsp_noisy
+    return calcium_nsp_noisy, spikes
 
 
 def smoothed_signals(signal, win_len, do_plots=False):
@@ -98,17 +98,19 @@ def cut_spikes(spikes, signal, deriv, win_len=5):
     bool_check = all(element==0 or element==1 for element in spikes)
 
     if bool_check:
-        spikes = np.where(spikes)[0]
+        event_spikes = np.where(spikes)[0]
     else:
-        spikes = spikes.astype(int)
+        event_spikes = spikes.astype(int)
 
     remove_index = []
-    for i in spikes:
+    for i in event_spikes:
         remove_index.append(np.arange(i-win_len, i+win_len))
         #add a line to include cut spikes
+    
     remove_index = np.array(remove_index)
     remove_index = remove_index.flatten()
     remove_index = remove_index[remove_index>0]
+    remove_index = remove_index[remove_index<len(signal)]
 
     signal = np.delete(signal, remove_index)
     deriv = np.delete(deriv, remove_index)
@@ -116,6 +118,8 @@ def cut_spikes(spikes, signal, deriv, win_len=5):
     return signal, deriv
 
 
+'''
+#following function was a try for developing cut_spikes for multiple neuros
 def cut_spikes1(spikes, signal, deriv, win_len=5):
     
     bool_check = np.all((spikes == 0) | (spikes == 1))
@@ -140,7 +144,7 @@ def cut_spikes1(spikes, signal, deriv, win_len=5):
         deriv = np.delete(deriv, idx)
 
     return signal, deriv
-
+'''
 
 
 ##### outlier removal functions
