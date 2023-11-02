@@ -10,13 +10,15 @@ import scipy.signal as sig
 
 from sklearn.linear_model import RANSACRegressor
 
+from memory_profiler import profile
+
 plt.style.use('ggplot')
 #plt.style.use('seaborn')
 
 #sns.set_style('white')
 
 
-
+@profile
 def sim_calcium(spikes, tau=100, neuron_id=500):
 
     if neuron_id == -1:
@@ -74,7 +76,7 @@ def sim_calcium(spikes, tau=100, neuron_id=500):
     #return calcium, calcium_noisy, calcium_nsp, calcium_nsp_noisy
     return calcium_nsp_noisy, spikes
 
-
+@profile
 def smoothed_signals(signal, win_len, do_plots=False):
     smooth_cal = sig.savgol_filter(signal, window_length=win_len, deriv=0, delta=1., polyorder=3)
     smooth_deriv = sig.savgol_filter(signal, window_length=win_len, deriv=1, delta=1., polyorder=3)
@@ -92,7 +94,7 @@ def smoothed_signals(signal, win_len, do_plots=False):
 
     return smooth_cal, smooth_deriv
 
-
+@profile
 def cut_spikes(spikes, signal, deriv, win_len=5):
     
     bool_check = all(element==0 or element==1 for element in spikes)
