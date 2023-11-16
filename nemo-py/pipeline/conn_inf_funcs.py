@@ -41,6 +41,8 @@ def conn_inf_LR(conn_matrix, signals, lag=10):
     G = np.load(conn_matrix)
     G = G - (np.diag(np.diag(G)))
 
+    print(G.shape)
+
     Y = signals[:, lag:]
     Y_prime = signals[:, :-lag]
 
@@ -50,6 +52,7 @@ def conn_inf_LR(conn_matrix, signals, lag=10):
     reg = LinearRegression(n_jobs=-1).fit(y_k, yk)
     A = reg.coef_
     A = A - (np.diag(np.diag(A)))
+    print(A.shape)
     
     corr_G_A = np.corrcoef(G.flatten(), A.flatten())[0, 1]
 
