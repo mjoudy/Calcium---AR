@@ -1,5 +1,5 @@
 #!/bin/bash
-#MOAB -N conn_inf
+#MOAB -N concat_data
 #MOAB -l walltime=00:55:00
 #MOAB -l mem=120gb
 #MOAB -l nodes=1:ppn=20
@@ -35,7 +35,7 @@ else
         mkdir $SaveDir
 fi
 
-python conn_inf.py
+python concat_data.py
 
 #mv $TMPDIR/results     $SaveDir
 

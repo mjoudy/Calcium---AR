@@ -76,7 +76,7 @@ def process_data(input_file):
     print("reconstructed spikes: ", time.time())
 
     #the processed chunks are going to be overwritten in the same file
-    np.save('feed_signals.npy', input_file)
+    np.save(input_file, feed_signals)
 
 
 #if __name__ == "__main__":: This line checks whether the script is being run as the main program.

@@ -18,8 +18,8 @@ processed_data_dir = os.path.dirname(__file__)
 
 data_name = 'spikes-10e4-ms'
 chunks_nums = 10
-# Load and concatenate the processed chunks along axis=0
-concatenated_data = load_and_concatenate_chunks(data_name, chunks_nums, processed_data_dir, axis=0)
+# Load and concatenate the processed chunks along axis=1
+concatenated_data = load_and_concatenate_chunks(data_name, chunks_nums, processed_data_dir, axis=1)
 print('the whole signals shape is:' + str(concatenated_data.shape))
 # Specify the directory and filename for the final concatenated file
 final_data_dir = os.path.dirname(__file__)
