@@ -1,9 +1,9 @@
 #!/bin/bash
-#MSUB -N ARRAYJOB
-#MSUB -t 0-99
-#MSUB -l walltime=1:00:00
-#MSUB -l mem=20gb
-#MSUB -l nodes=100:ppn=20
+#MOAB -N ARRAYJOB
+#MOAB -t 0-99
+#MOAB -l walltime=1:00:00
+#MOAB -l mem=20gb
+#MOAB -l nodes=100:ppn=20
 
 module load devel/python/3.6.9
 module load mpi/openmpi/4.0-gnu-9.2
