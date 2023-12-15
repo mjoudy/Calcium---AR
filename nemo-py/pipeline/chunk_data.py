@@ -2,11 +2,11 @@ import os
 import numpy as np
 
 #data_dir = '/home/fr/fr_fr/fr_mj200'
+data_dir = '/work/ws/nemo/fr_mj200-lasso_reg-0/pipeline/source_data/t-60e6'
 #data_dir = os.getpwd()
-data_dir = os.path.dirname(__file__)
+#data_dir = os.path.dirname(__file__)
 print(data_dir)
-#data_dir = ''
-data_file = 'spikes-10e4-ms.npy'
+data_file = 'spikes-60e6-ms.npy'
 data_address = data_dir+ '/' + data_file
 data = np.load(data_address)
 
@@ -30,13 +30,11 @@ def save_chunks(chunks, prefix, save_dir):
         np.save(filename, chunk)
 
 
-chunks_nums = 10
+chunks_nums = 100
 chunks = divide_to_chunks(data, chunks_nums)
 
 data_name = data_file.split('.')[0]
-#save_dir = '/work/ws/nemo/fr_mj200-lasso_reg-0/pipeline/'
-#save_dir = os.getcwd()
-save_dir = os.path.dirname(__file__)
+save_dir = '/work/ws/nemo/fr_mj200-lasso_reg-0/pipeline/source_data/t-60e6/chunked'
 save_chunks(chunks, data_name, save_dir)
 
 print('the first chunk shape is:' + str(chunks[0].shape))

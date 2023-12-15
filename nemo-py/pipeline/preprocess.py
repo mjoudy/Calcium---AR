@@ -1,51 +1,32 @@
-import sys
 import numpy as np
 import scipy as sp
 import matplotlib.pyplot as plt
 import scipy.signal as sig
-#import seaborn as sns
-
-#from sklearn.linear_model import LinearRegression
-#from sklearn.linear_model import Lasso
-#from sklearn.linear_model import Ridge
 
 import kernel_est_funcs as kef
 import conn_inf_funcs as cif
 import remove_outliers as ro
 import kernel_fit as kf
 
+import os
+import sys
 import time
-#import cProfile
-#from memory_profiler import profile
-
-#profiler = cProfile.Profile()
 
 plt.style.use('ggplot')
-#plt.style.use('seaborn')
-
-#sns.set_style('white')
 
 print("start: ", time.time())
 
-
-#profiler.enable()
-
 def process_data(input_file):
-    # Load the data
-    spikes_add = input_file
-    #conn_mat_add = 'connectivity-10e4-ms.npy'
-    spikes = np.load(spikes_add)
-    print('spikes length: ', spikes_add)
-    print("loaded the spikes: ", time.time())
-
-    calcium_signal, spikes = kef.sim_calcium(spikes, neuron_id=-1)
-    print("simulated the calcium: ", time.time())
+    calcium_add =  input_file
+    calcium_signal = np.load(calcium_add)
+    calcium_name = calcium_add.split('/')[-1]
+    print('calcium length: ', calcium_name)
+    print("loaded the calcium: ", time.time())
 
     signal, deriv = kef.smoothed_signals(calcium_signal, 51, do_plots=False)
     print("smoothed signals and calculated the derivative by sav-gol: ", time.time())
 
-
-    n_rows = np.shape(spikes)[0]
+    n_rows = np.shape(calcium_signal)[0]
 
     #this not an array, it is a list. what would be if it was an array?
     # Initialize an empty array to store the results
@@ -54,13 +35,13 @@ def process_data(input_file):
 
     # Apply the function to each row
     for i in range(n_rows):
-        signal_temp, deriv_temp = kef.cut_spikes(spikes[i, :], signal[i, :], deriv[i, :], win_len=5)
+        signal_temp, deriv_temp = kef.cut_spikes(calcium_signal[i, :], signal[i, :], deriv[i, :], win_len=5)
         signal_cut.append(signal_temp)
         deriv_cut.append(deriv_temp)
 
     print("cut signal and the derivative at spikes occuring: ", time.time())
     
-    n_rows = np.shape(spikes)[0]
+    n_rows = np.shape(calcium_signal)[0]
     tau_est = np.empty(n_rows)
 
     for i in range(n_rows):
@@ -69,14 +50,19 @@ def process_data(input_file):
     print("estimated tau: ", time.time())
 
 
-    feed_signals = np.empty((n_rows, np.shape(spikes)[1]))
+    feed_signals = np.empty((n_rows, np.shape(calcium_signal)[1]))
     for i in range(n_rows):
         feed_signals[i] = cif.reconstructed_spikes(signal[i], deriv[i], tau_est[i])
 
     print("reconstructed spikes: ", time.time())
 
-    #the processed chunks are going to be overwritten in the same file
-    np.save(input_file, feed_signals)
+    parts = calcium_name.split('-')
+    new_file_name = f"feed-{parts[1]}-{parts[2]}"
+
+    save_dir = "/work/ws/nemo/fr_mj200-lasso_reg-0/pipeline/source_data/t-60e6/chunked-processed"
+    feed_save_path = os.path.join(save_dir, new_file_name)
+
+    np.save(feed_save_path, feed_signals)
 
 
 #if __name__ == "__main__":: This line checks whether the script is being run as the main program.
@@ -99,5 +85,3 @@ if __name__ == '__main__':
 
     process_data(input_file)
     print("feed signal of chunks created: ", time.time())
-
-

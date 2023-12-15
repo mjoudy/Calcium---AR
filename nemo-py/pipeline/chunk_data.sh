@@ -41,3 +41,5 @@ python chunk_data.py
 
 
 echo "FINISHED $(date)"
+~
+~                           

@@ -18,8 +18,8 @@ module load mpi/openmpi/4.0-gnu-9.2
 export WORK='/work/ws/nemo/fr_mj200-lasso_reg-0'
 export SUBMITDIR=$(pwd)
 
-PYTHON_SCRIPT="python calcium_sim.py"
+PYTHON_SCRIPT="python calcium_sim2.py"
 
-INPUT_FILE=source_data/t-60e6/chunked-calcium/calcium-60e6-ms_$MOAB_JOBARRAYINDEX.npy
+INPUT_FILE=source_data/t-60e6/chunked/spikes-60e6-ms_$MOAB_JOBARRAYINDEX.npy
 
 $PYTHON_SCRIPT $INPUT_FILE
