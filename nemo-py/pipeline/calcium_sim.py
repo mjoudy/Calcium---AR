@@ -16,7 +16,6 @@ plt.style.use('ggplot')
 
 print("start: ", time.time())
 
-
 def make_calcium(input_file):
     spikes_add =  input_file
     spikes = np.load(spikes_add)
@@ -46,5 +45,5 @@ if __name__ == '__main__':
     input_file = sys.argv[1]
 
     make_calcium(input_file)
-    print("feed signal of chunks created: ", time.time())
+    print("calcium signal of chunks created: ", time.time())
 
