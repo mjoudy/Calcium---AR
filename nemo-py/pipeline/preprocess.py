@@ -45,7 +45,8 @@ def process_data(input_file):
     tau_est = np.empty(n_rows)
 
     for i in range(n_rows):
-        tau_est[i] = kef.estimate_tau(signal_cut[i], deriv_cut[i], do_plots=False)
+        #tau_est[i] = kef.estimate_tau(signal_cut[i], deriv_cut[i], do_plots=False)
+        tau_est[i] = kef.pure_fit(signal_cut[i], deriv_cut[i], do_plots=False)
 
     print("estimated tau: ", time.time())
 

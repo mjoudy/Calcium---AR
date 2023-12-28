@@ -18,8 +18,13 @@ module load mpi/openmpi/4.0-gnu-9.2
 export WORK='/work/ws/nemo/fr_mj200-lasso_reg-0'
 export SUBMITDIR=$(pwd)
 
-PYTHON_SCRIPT="python calcium_sim.py"
+PYTHON_SCRIPT="python preprocess.py"
 
 INPUT_FILE=source_data/t-60e6/chunked-calcium/calcium-60e6-ms_$MOAB_JOBARRAYINDEX.npy
 
 $PYTHON_SCRIPT $INPUT_FILE
+
+# !!!!!!! check the number of jobs in the array.!!!!
+if [ $MOAB_JOBARRAYINDEX -eq 99 ]; then
+    python -c "from loging_pipeline import log_process; log_process('calcium signals of chunks are pre-preocessed.')"
+fi

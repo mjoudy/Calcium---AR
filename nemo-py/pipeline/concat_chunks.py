@@ -14,7 +14,8 @@ def load_and_concatenate_chunks(prefix, num_chunks, load_dir, axis=1):
 
 # Specify the directory where the processed chunks are saved
 #processed_data_dir = os.getcwd()
-processed_data_dir = os.path.dirname(__file__)
+#processed_data_dir = os.path.dirname(__file__)
+processed_data_dir = "/work/ws/nemo/fr_mj200-lasso_reg-0/pipeline/source_data/t-60e6/chunked-processed"
 
 data_name = 'spikes-10e4-ms'
 chunks_nums = 10
