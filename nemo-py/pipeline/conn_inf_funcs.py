@@ -36,26 +36,32 @@ def reconstructed_spikes(signal, deriv, cut_signal, cut_deriv):
 '''
 
 
-def conn_inf_LR(conn_matrix, signals, lag=10):
-    
+def conn_inf_LR(conn_matrix, signals_matrix, lag=10, save_mat=False):
+
     G = np.load(conn_matrix)
-    print('G shape: ', G.shape)
     G = G - (np.diag(np.diag(G)))
+    print("shape G:", G.shape)
 
-    print(G.shape)
-
+    signals = np.load(signals_matrix)
+    print('shape signal:', signals.shape)
     Y = signals[:, lag:]
+    print("shape Y:", Y.shape)
     Y_prime = signals[:, :-lag]
+    print('shape Y_prime:', Y_prime.shape)
 
     yk = Y.T
+    print('shape yk:', yk.shape)
     y_k = Y_prime.T
-    
+    print('shape Y_prime:', Y_prime.shape)
+
     reg = LinearRegression(n_jobs=-1).fit(y_k, yk)
     A = reg.coef_
     A = A - (np.diag(np.diag(A)))
-    print(A.shape)
-    
-    corr_G_A = np.corrcoef(G.flatten(), A.flatten())[0, 1]
 
-    return corr_G_A
+    if save_mat:
+       est_conn_name = f"{conn_matrix}_{signals}_{lag}.npy"
+       np.save(est_conn_name, A)
 
+    #corr_G_A = np.corrcoef(G.flatten(), A.flatten())[0, 1]
+
+    return A, G
