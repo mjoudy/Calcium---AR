@@ -7,6 +7,7 @@ import scipy.signal as sig
 from sklearn.linear_model import LinearRegression
 from sklearn.linear_model import Lasso
 from sklearn.linear_model import Ridge
+from sklearn import metrics
 
 import remove_outliers as ro
 
@@ -65,3 +66,33 @@ def conn_inf_LR(conn_matrix, signals_matrix, lag=10, save_mat=False):
     #corr_G_A = np.corrcoef(G.flatten(), A.flatten())[0, 1]
 
     return A, G
+
+def find_overlap(data1, data2):
+    min_max = max(min(data1), min(data2))
+    max_min = min(max(data1), max(data2))
+    if min_max < max_min:  # Ensure there is an overlap
+        return min_max, max_min
+    else:
+        return None  # No overlap
+
+def overlap_interval(G, A):
+    G = G.flatten()
+    A = A.flatten()
+    A_exc = A[G>0]
+    A_inh = A[G<0]
+    A_unc = A[G==0]
+
+    e_u_min, e_u_max = find_overlap(A_exc, A_unc)
+    i_u_min, i_u_max = find_overlap(A_inh, A_unc)
+
+    return e_u_min, e_u_max, i_u_min, i_u_max
+
+def performance_score(thresholded_G, thresholded_A):
+    confusion_matrix = metrics.confusion_matrix(thresholded_G, thresholded_A)
+
+    score = 0
+    for i in range(confusion_matrix.shape[0]):
+        score += confusion_matrix[i, i]/sum(confusion_matrix[i, :])
+
+    return score
+
