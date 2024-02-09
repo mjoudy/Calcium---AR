@@ -19,13 +19,6 @@ def divide_to_chunks(array, num_chunks, axis=1):
     chunks = [array.take(range(i*chunk_size, (i+1)*chunk_size), axis=axis) for i in range(num_chunks)]
     return chunks
 
-'''
-def divide_to_chunks(array, num_chunks):
-    chunk_size = array.shape[0] // num_chunks
-    chunks = [array[i:i+chunk_size] for i in range(0, array.shape[0], chunk_size)]
-    return chunks
-'''
-
 def save_chunks(chunks, prefix, save_dir):
     for i, chunk in enumerate(chunks):
         filename = os.path.join(save_dir, f'{prefix}_{i}.npy')
@@ -45,4 +38,4 @@ save_chunks(chunks, data_name, save_dir)
 print('the first chunk shape is:' + str(chunks[0].shape))
 print(save_dir)
 
-log_process("chunking data is done")
+log_process("chunking data is done")                                                
