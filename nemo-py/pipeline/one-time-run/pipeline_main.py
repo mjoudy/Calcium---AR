@@ -11,7 +11,7 @@ input_dir = '/work/ws/nemo/fr_mj200-lasso_reg-0/pipeline/source_data/t-60e6'
 input_file_name = 'spikes-60e6-ms.npy'
 #chunked_dir = input_dir/chunked
 chunks_nums = 100
-cf.chunk_data(input_dir, input_file_name, number_of_chunks=chunks_nums)
+cf.chunk_data(input_dir, input_file_name, chuncks_nums=chunks_nums)
 
 #need to be modified for a general address
 current_dir = os.path.dirname(os.path.abspath(__file__))
