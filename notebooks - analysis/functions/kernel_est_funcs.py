@@ -15,6 +15,41 @@ plt.style.use('ggplot')
 
 #sns.set_style('white')
 
+def dask_calcium(spikes, tau=100):
+
+    N = np.shape(spikes)[0]
+    wup_time = 1000
+    spikes = spikes[:, wup_time:]
+    sim_dur = np.shape(spikes)[1]
+    
+    noise_intra = np.random.normal(0, 0.01, (N, sim_dur))
+    spikes_noisy = spikes + noise_intra
+
+    calcium = np.zeros((N, sim_dur))
+    calcium_nsp = np.zeros((N, sim_dur))
+    dt = 1
+    const_A = np.exp((-1/tau)*dt)
+
+    calcium[:, 0] = spikes[:, 0]
+    calcium_nsp[:, 0] = spikes[:, 0]
+
+    for t in range(1, sim_dur):
+        calcium[:, t] = const_A*calcium[:, t-1] + spikes[:, t]
+
+    for t in range(1, sim_dur):
+        calcium_nsp[:, t] = const_A*calcium_nsp[:, t-1] + spikes_noisy[:, t]
+
+    noise_recording = np.random.normal(0,1, (N, sim_dur))
+    calcium_noisy = calcium + noise_recording
+    calcium_nsp_noisy = calcium_nsp + noise_recording
+
+    return calcium_nsp_noisy
+
+def dask_smooth(signal, win_len=5):
+    smooth_cal = sig.savgol_filter(signal, window_length=win_len, deriv=0, delta=1., polyorder=3)
+    smooth_deriv = sig.savgol_filter(signal, window_length=win_len, deriv=1, delta=1., polyorder=3)
+
+    return smooth_deriv
 
 
 def sim_calcium(spikes, tau=100, neuron_id=500):
