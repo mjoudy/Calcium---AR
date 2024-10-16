@@ -1,1 +1,6 @@
-phd-env/
+# Conda environment files
+envs/
+.conda/
+.condarc
+.conda_envs/
+.conda_pkgs/

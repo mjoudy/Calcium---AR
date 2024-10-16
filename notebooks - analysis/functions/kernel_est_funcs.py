@@ -18,7 +18,7 @@ plt.style.use('ggplot')
 def dask_calcium(spikes, tau=100):
 
     N = np.shape(spikes)[0]
-    wup_time = 1000
+    wup_time = 100
     spikes = spikes[:, wup_time:]
     sim_dur = np.shape(spikes)[1]
     
