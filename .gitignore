@@ -4,3 +4,7 @@ envs/
 .condarc
 .conda_envs/
 .conda_pkgs/
+
+*.dat
+*.npy
+*.h5
