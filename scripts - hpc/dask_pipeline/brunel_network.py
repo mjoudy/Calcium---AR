@@ -64,28 +64,50 @@ class BrunelNetwork:
         self.nodes_in = nest.Create("iaf_psc_delta", self.NI, params=self.neuron_params)
 
         self.noise = nest.Create("poisson_generator")
-        self.espikes = nest.Create("spike_recorder")
-        self.ispikes = nest.Create("spike_recorder")
-        '''
-        multimeter_network_E = nest.Create("multimeter")
-        nest.SetStatus(multimeter_network_E, {"record_from":["V_m"]})
 
-        multimeter_network_I = nest.Create("multimeter")
-        nest.SetStatus(multimeter_network_I, {"record_from":["V_m"]})
-        '''
+        self.multimeter_network_E = nest.Create("multimeter")
+        nest.SetStatus(self.multimeter_network_E, {"record_from":["V_m"]})
+
+        self.multimeter_network_I = nest.Create("multimeter")
+        nest.SetStatus(self.multimeter_network_I, {"record_from":["V_m"]})
+        
         self.sp_detector = nest.Create("spike_recorder")
+        self.raster_exc = nest.Create("spike_recorder")
+        self.raster_inh = nest.Create("spike_recorder")
 
     def connect_elements(self):
 
         nest.Connect(self.noise, self.nodes_ex, syn_spec="excitatory")
         nest.Connect(self.noise, self.nodes_in, syn_spec="excitatory")
 
-        nest.Connect(self.nodes_ex[:self.network_params['N_rec']], self.espikes)
-        nest.Connect(self.nodes_in[:self.network_params['N_rec']], self.ispikes)
+        nest.Connect(self.multimeter_network_E, self.nodes_ex)
+        nest.Connect(self.multimeter_network_I, self.nodes_in)
+
+        nest.Connect(self.nodes_ex + self.nodes_in, self.sp_detector, syn_spec="excitatory")        
+
+        nest.Connect(self.nodes_ex[:self.sim_params['N_rec']], self.raster_exc, syn_spec="excitatory")
+        nest.Connect(self.nodes_in[:self.sim_params['N_rec']], self.raster_inh, syn_spec="excitatory")
+
+        conn_params_ex = {'rule': 'fixed_indegree', 'indegree': self.CE}
+        nest.Connect(self.nodes_ex, self.nodes_ex + self.nodes_in, conn_params_ex, "excitatory")
+
+        conn_params_in = {'rule': 'fixed_indegree', 'indegree': self.CI}
+        nest.Connect(self.nodes_in, self.nodes_ex + self.nodes_in, conn_params_in, "inhibitory")
+
+
+    def simulate(self):
+
+        
+
+
+        
+
+        self.end_setup = time.time()
+
 
         nest.Connect(self.nodes_ex, self.nodes_ex, conn_spec={'rule': 'pairwise_bernoulli', 'p': self.network_params['epsilon']}, syn_spec="excitatory")
         nest.Connect(self.nodes_ex, self.nodes_in, conn_spec={'rule': 'pairwise_bernoulli', 'p': self.network_params['epsilon']}, syn_spec="excitatory")
         nest.Connect(self.nodes_in, self.nodes_ex, conn_spec={'rule': 'pairwise_bernoulli', 'p': self.network_params['epsilon']}, syn_spec="inhibitory")
         nest.Connect(self.nodes_in, self.nodes_in, conn_spec={'rule': 'pairwise_bernoulli', 'p': self.network_params['epsilon']}, syn_spec="inhibitory")
-
-        self.end_setup = time.time()
+        nest.Connect(self.nodes_ex + self.nodes_in, self.sp_detector, syn_spec="excitatory")
+        ne

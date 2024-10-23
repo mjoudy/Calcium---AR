@@ -2,7 +2,8 @@
     "sim_params": {
         "cpu_num": 20,
         "time_res": 0.1,
-        "sim_length": 1000000
+        "sim_length": 1000000,
+        "N_rec": 50
     },
 
     "network_params": {

@@ -73,11 +73,11 @@ print("Building network")
 #neuron test
 neuron_test = nest.Create("iaf_psc_delta", 1)
 
-multimeter_network_E = nest.Create("multimeter")
-nest.SetStatus(multimeter_network_E, {"record_from":["V_m"]})
+##multimeter_network_E = nest.Create("multimeter")
+##nest.SetStatus(multimeter_network_E, {"record_from":["V_m"]})
 
-multimeter_network_I = nest.Create("multimeter")
-nest.SetStatus(multimeter_network_I, {"record_from":["V_m"]})
+##multimeter_network_I = nest.Create("multimeter")
+##nest.SetStatus(multimeter_network_I, {"record_from":["V_m"]})
 
 ##sp_detector = nest.Create("spike_recorder")
 
@@ -94,24 +94,24 @@ nest.CopyModel("static_synapse", "inhibitory",
 #neuron test noise
 nest.Connect(noise, neuron_test, syn_spec="excitatory")
 
-nest.Connect(multimeter_network_E, nodes_ex)
-nest.Connect(multimeter_network_I, nodes_in)
+##nest.Connect(multimeter_network_E, nodes_ex)
+##nest.Connect(multimeter_network_I, nodes_in)
 
-nest.Connect(nodes_ex + nodes_in, sp_detector, syn_spec="excitatory")
+##nest.Connect(nodes_ex + nodes_in, sp_detector, syn_spec="excitatory")
 
-nest.Connect(nodes_ex[:N_rec], espikes, syn_spec="excitatory")
-nest.Connect(nodes_in[:N_rec], ispikes, syn_spec="excitatory")
+##nest.Connect(nodes_ex[:N_rec], espikes, syn_spec="excitatory")
+##nest.Connect(nodes_in[:N_rec], ispikes, syn_spec="excitatory")
 
 print("Connecting network")
 print("Excitatory connections")
 
-conn_params_ex = {'rule': 'fixed_indegree', 'indegree': CE}
-nest.Connect(nodes_ex, nodes_ex + nodes_in, conn_params_ex, "excitatory")
+##conn_params_ex = {'rule': 'fixed_indegree', 'indegree': CE}
+##nest.Connect(nodes_ex, nodes_ex + nodes_in, conn_params_ex, "excitatory")
 
 print("Inhibitory connections")
 
-conn_params_in = {'rule': 'fixed_indegree', 'indegree': CI}
-nest.Connect(nodes_in, nodes_ex + nodes_in, conn_params_in, "inhibitory")
+##conn_params_in = {'rule': 'fixed_indegree', 'indegree': CI}
+##nest.Connect(nodes_in, nodes_ex + nodes_in, conn_params_in, "inhibitory")
 
 endbuild = time.time()
 print("Simulating")
