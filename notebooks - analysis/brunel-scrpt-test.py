@@ -11,10 +11,10 @@ import csv
 #import pandas as pd
 import h5py
 
-nest.ResetKernel()
+#nest.ResetKernel()
 
-startbuild = time.time()
-nest.SetKernelStatus({"local_num_threads": 20})
+#startbuild = time.time()
+#nest.SetKernelStatus({"local_num_threads": 20})
 
 ##dt = 0.1  # the resolution in ms
 ##simtime = 10000 # Simulation time in ms
@@ -47,28 +47,28 @@ N_rec = 50  # record from 50 neurons
 ##J_ex = J  # amplitude of excitatory postsynaptic potential
 ##J_in = -g * J_ex  # amplitude of inhibitory postsynaptic potential
 
-nu_th = theta / (J * CE * tauMem)
-nu_ex = eta * nu_th
-p_rate = 10000.0 * nu_ex * CE
+##nu_th = theta / (J * CE * tauMem)
+##nu_ex = eta * nu_th
+##p_rate = 10000.0 * nu_ex * CE
 
-nest.SetKernelStatus({"resolution": dt, "print_time": True,
-                      "overwrite_files": True})
+##nest.SetKernelStatus({"resolution": dt, "print_time": True,
+##                      "overwrite_files": True})
 
 print("Building network")
 
-nest.SetDefaults("iaf_psc_delta", neuron_params)
-nest.SetDefaults("poisson_generator", {"rate": p_rate})
+##nest.SetDefaults("iaf_psc_delta", neuron_params)
+##nest.SetDefaults("poisson_generator", {"rate": p_rate})
 
 #DC generator
-nest.SetDefaults("dc_generator", {"amplitude": 6.})
+##nest.SetDefaults("dc_generator", {"amplitude": 6.})
 
-nodes_ex = nest.Create("iaf_psc_delta", NE, params=neuron_params)
-nodes_in = nest.Create("iaf_psc_delta", NI, params=neuron_params)
+##nodes_ex = nest.Create("iaf_psc_delta", NE, params=neuron_params)
+##nodes_in = nest.Create("iaf_psc_delta", NI, params=neuron_params)
 
 #DC Generator
-noise = nest.Create("poisson_generator")
-espikes = nest.Create("spike_recorder")
-ispikes = nest.Create("spike_recorder")
+##noise = nest.Create("poisson_generator")
+##espikes = nest.Create("spike_recorder")
+##ispikes = nest.Create("spike_recorder")
 
 #neuron test
 neuron_test = nest.Create("iaf_psc_delta", 1)
@@ -79,7 +79,7 @@ nest.SetStatus(multimeter_network_E, {"record_from":["V_m"]})
 multimeter_network_I = nest.Create("multimeter")
 nest.SetStatus(multimeter_network_I, {"record_from":["V_m"]})
 
-sp_detector = nest.Create("spike_recorder")
+##sp_detector = nest.Create("spike_recorder")
 
 ###### !!!!!!! ########
 
@@ -88,8 +88,8 @@ nest.CopyModel("static_synapse", "excitatory",
 nest.CopyModel("static_synapse", "inhibitory",
                {"weight": J_in, "delay": delay})
 
-nest.Connect(noise, nodes_ex, syn_spec="excitatory")
-nest.Connect(noise, nodes_in, syn_spec="excitatory")
+##nest.Connect(noise, nodes_ex, syn_spec="excitatory")
+##nest.Connect(noise, nodes_in, syn_spec="excitatory")
 
 #neuron test noise
 nest.Connect(noise, neuron_test, syn_spec="excitatory")
