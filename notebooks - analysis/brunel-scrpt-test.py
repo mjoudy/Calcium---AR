@@ -16,36 +16,36 @@ nest.ResetKernel()
 startbuild = time.time()
 nest.SetKernelStatus({"local_num_threads": 20})
 
-dt = 0.1  # the resolution in ms
-simtime = 10000 # Simulation time in ms
+##dt = 0.1  # the resolution in ms
+##simtime = 10000 # Simulation time in ms
 
-g = 6.0  # ratio inhibitory weight/excitatory weight
-eta = 2.0  # external rate relative to threshold rate
-epsilon = 0.1  # connection probability
+##g = 6.0  # ratio inhibitory weight/excitatory weight
+##eta = 2.0  # external rate relative to threshold rate
+##epsilon = 0.1  # connection probability
 
-order = 250
-NE = 4 * order  # number of excitatory neurons
-NI = 1 * order  # number of inhibitory neurons
-N_neurons = NE + NI  # number of neurons in total
+##order = 250
+##NE = 4 * order  # number of excitatory neurons
+##NI = 1 * order  # number of inhibitory neurons
+##N_neurons = NE + NI  # number of neurons in total
 N_rec = 50  # record from 50 neurons
 
-CE = int(epsilon * NE)  # number of excitatory synapses per neuron
-CI = int(epsilon * NI)  # number of inhibitory synapses per neuron
-C_tot = int(CI + CE)  # total number of synapses per neuron
+##CE = int(epsilon * NE)  # number of excitatory synapses per neuron
+##CI = int(epsilon * NI)  # number of inhibitory synapses per neuron
+##C_tot = int(CI + CE)  # total number of synapses per neuron
 
-delay = 1.5  # synaptic delay in ms
-tauMem = 20.0  # time constant of membrane potential in ms
-theta = 20.0  # membrane threshold potential in mV
-neuron_params = {"C_m": 1.0,
+##delay = 1.5  # synaptic delay in ms
+##tauMem = 20.0  # time constant of membrane potential in ms
+##theta = 20.0  # membrane threshold potential in mV
+##neuron_params = {"C_m": 1.0,
                  "tau_m": tauMem,
                  "t_ref": 2.0,
                  "E_L": 0.0,
                  "V_reset": 0.0,
                  "V_m": 0.0,
                  "V_th": theta}
-J = 8.  # postsynaptic amplitude in mV
-J_ex = J  # amplitude of excitatory postsynaptic potential
-J_in = -g * J_ex  # amplitude of inhibitory postsynaptic potential
+##J = 8.  # postsynaptic amplitude in mV
+##J_ex = J  # amplitude of excitatory postsynaptic potential
+##J_in = -g * J_ex  # amplitude of inhibitory postsynaptic potential
 
 nu_th = theta / (J * CE * tauMem)
 nu_ex = eta * nu_th

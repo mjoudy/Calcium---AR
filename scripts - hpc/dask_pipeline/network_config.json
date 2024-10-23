@@ -1,0 +1,29 @@
+{
+    "sim_params": {
+        "cpu_num": 20,
+        "time_res": 0.1,
+        "sim_length": 1000000
+    },
+
+    "network_params": {
+        "g": 6.0,
+        "eta": 2.0,
+        "epsilon": 0.1,
+        "order": 250
+    },
+
+    "syn_Params": {
+        "delay": 1.5,
+        "J": 8.0       
+    },
+
+    "neuron_params": {
+        "C_m": 1.0,
+        "tau_m": 20.0,
+        "t_ref": 2.0,
+        "E_L": 0.0,
+        "V_reset": 0.0,
+        "V_m": 0.0,
+        "V_th": 20.0
+    }
+}
