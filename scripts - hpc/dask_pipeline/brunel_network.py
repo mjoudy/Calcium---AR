@@ -36,8 +36,8 @@ class BrunelNetwork:
     def ext_input(self):
 
         nu_th = self.neuron_params['V_th'] / (self.J_ex * self.CE * self.neuron_params['tau_m'])
-        nu_ex = self.network_params['eta'] * self.nu_th
-        p_rate = 10000.0 * self.nu_ex * self.CE
+        nu_ex = self.network_params['eta'] * nu_th
+        p_rate = 10000.0 * nu_ex * self.CE
 
         return p_rate
     
@@ -103,15 +103,15 @@ class BrunelNetwork:
 
         start_sim = time.time()
         print("Starting Brunel network simulation: ", start_sim)
-        nest.Simulate(self.sim_params['sim_time'])
+        nest.Simulate(self.sim_params['sim_length'])
         end_sim = time.time()
         print("Simulation finished: ", end_sim)
 
         self.events_ex = nest.GetStatus(self.raster_exc, keys="n_events")[0]
         self.events_in = nest.GetStatus(self.raster_inh, keys="n_events")[0]
 
-        rates_ex = self.events_ex / self.sim_params['sim_time'] * 1000.0 / self.sim_params['N_rec']
-        rates_in = self.events_in / self.sim_params['sim_time'] * 1000.0 / self.sim_params['N_rec']
+        rates_ex = self.events_ex / self.sim_params['sim_length'] * 1000.0 / self.sim_params['N_rec']
+        rates_in = self.events_in / self.sim_params['sim_length'] * 1000.0 / self.sim_params['N_rec']
 
         num_synapses = (nest.GetDefaults("excitatory")["num_connections"] +
                 nest.GetDefaults("inhibitory")["num_connections"])
@@ -131,9 +131,9 @@ class BrunelNetwork:
     def record_data(self):
 
         sp_detector_data = nest.GetStatus(self.sp_detector, keys="events")[0]
-        sp_times = self.sp_detector_data["times"]
-        sp_senders = self.sp_detector_data["senders"]
-        self.spikes_trains = np.histogram2d(sp_senders, sp_times, bins=[range(1, self.N_neurons), np.arange(0, self.sim_params['sim_time']+1, 1)])[0]
+        sp_times = sp_detector_data["times"]
+        sp_senders = sp_detector_data["senders"]
+        self.spikes_trains = np.histogram2d(sp_senders, sp_times, bins=[range(1, self.N_neurons), np.arange(0, self.sim_params['sim_length']+1, 1)])[0]
 
         '''
         self.multimeter_data_E = nest.GetStatus(self.multimeter_network_E, keys="events")[0]
@@ -155,14 +155,22 @@ class BrunelNetwork:
             self.adj_matrix[i-1][j-1] = weights[counter]
             counter += 1
 
+        return self.spikes_trains, self.adj_matrix
+    
+
     def save_data(self):
         
-        name_time = f"{self.sim_params['sim_time']:.1e}".replace('+', '').replace('.', '')
-        name_prefix = f"N{self.N_neurons}-" + name_time
-        with h5py.File('spikes-'+name_prefix+'.hdf5', 'w') as f:
+        name_time = f"{self.sim_params['sim_length']:.1e}".replace('+', '').replace('.', '')
+        name_prefix = f"N{self.N_neurons}-T" + name_time
+        name_spikes = "spikes-"+name_prefix+".hdf5"
+        name_adj = "connectivity-"+name_prefix+".npy"
+
+        with h5py.File(name_spikes, 'w') as f:
             f.create_dataset('spikes_trains', data=self.spikes_trains)
 
-        np.save("connectivity-"+name_prefix, self.adj_matrix)
+        np.save(name_adj, self.adj_matrix)
+
+        return name_spikes, name_adj
 
     def raster(self):
         nest.raster_plot.from_device(self.raster_exc, hist=True, hist_binwidth=.5)

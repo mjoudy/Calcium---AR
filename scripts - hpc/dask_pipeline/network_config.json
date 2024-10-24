@@ -2,7 +2,7 @@
     "sim_params": {
         "cpu_num": 20,
         "time_res": 0.1,
-        "sim_length": 1000000,
+        "sim_length": 1000,
         "N_rec": 50
     },
 
@@ -10,10 +10,10 @@
         "g": 6.0,
         "eta": 2.0,
         "epsilon": 0.1,
-        "order": 250
+        "order": 100
     },
 
-    "syn_Params": {
+    "syn_params": {
         "delay": 1.5,
         "J": 8.0       
     },

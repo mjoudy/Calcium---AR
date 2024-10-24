@@ -8,3 +8,4 @@ envs/
 *.dat
 *.npy
 *.h5
+*.hdf5
