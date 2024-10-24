@@ -48,10 +48,12 @@ class BrunelNetwork:
     def setup_kernel(self):
 
         nest.ResetKernel()
-        self.strat_setup = time.time()
-        nest.SetKernelStatus({"local_num_threads": self.sim_params['cpu_num']})
-        nest.SetKernelStatus({"resolution": self.sim_params['time_res'], "print_time": True,
-                      "overwrite_files": True})
+        nest.SetKernelStatus({
+            "local_num_threads": self.sim_params['cpu_num'],
+            "resolution": self.sim_params['time_res'],
+            "print_time": True,
+            "overwrite_files": True
+        })
 
 
     def setup_elements(self):
@@ -70,6 +72,11 @@ class BrunelNetwork:
 
         self.multimeter_network_I = nest.Create("multimeter")
         nest.SetStatus(self.multimeter_network_I, {"record_from":["V_m"]})
+
+        nest.CopyModel("static_synapse", "excitatory",
+                       {"weight": self.J_ex, "delay": self.syn_params['delay']})
+        nest.CopyModel("static_synapse", "inhibitory",
+                       {"weight": self.J_in, "delay": self.syn_params['delay']})
         
         self.sp_detector = nest.Create("spike_recorder")
         self.raster_exc = nest.Create("spike_recorder")
@@ -97,17 +104,70 @@ class BrunelNetwork:
 
     def simulate(self):
 
+        start_sim = time.time()
+        print("Starting Brunel network simulation: ", start_sim)
+        nest.Simulate(self.sim_params['sim_time'])
+        end_sim = time.time()
+        print("Simulation finished: ", end_sim)
+
+        self.events_ex = nest.GetStatus(self.raster_exc, keys="n_events")[0]
+        self.events_in = nest.GetStatus(self.raster_inh, keys="n_events")[0]
+
+        rates_ex = self.events_ex / self.sim_params['sim_time'] * 1000.0 / self.sim_params['N_rec']
+        rates_in = self.events_in / self.sim_params['sim_time'] * 1000.0 / self.sim_params['N_rec']
+
+        num_synapses = (nest.GetDefaults("excitatory")["num_connections"] +
+                nest.GetDefaults("inhibitory")["num_connections"])
+
+        sim_time = end_sim - start_sim
+
+        print("Brunel network simulation finished")
+        print("Number of neurons: {}".format(self.N_neurons))
+        print("Number of synapses: {}".format(num_synapses))
         
+        print("Excitatory rate: %.2f Hz".format(rates_ex))
+        print("Inhibitory rate: %.2f Hz".format(rates_in))
+        print("Simulation time: {}".format(sim_time))
 
 
+    
+    def record_data(self):
+
+        sp_detector_data = nest.GetStatus(self.sp_detector, keys="events")[0]
+        sp_times = self.sp_detector_data["times"]
+        sp_senders = self.sp_detector_data["senders"]
+        self.spikes_trains = np.histogram2d(sp_senders, sp_times, bins=[range(1, self.N_neurons), np.arange(0, self.sim_params['sim_time']+1, 1)])[0]
+
+        '''
+        self.multimeter_data_E = nest.GetStatus(self.multimeter_network_E, keys="events")[0]
+        self.multimeter_data_I = nest.GetStatus(self.multimeter_network_I, keys="events")[0]
+
+        self.multimeter_times = self.multimeter_data_E["times"]
+        self.multimeter_senders = self.multimeter_data_E["senders"]
+        self.multimeter_V_m_E = self.multimeter_data_E["V_m"]
+        self.multimeter_V_m_I = self.multimeter_data_I["V_m"]
+        '''
+        conn_tuple = nest.GetConnections(source= self.nodes_ex + self.nodes_in, target=self.nodes_ex + self.nodes_in)
+        self.adj_matrix = np.zeros((self.N_neurons, self.N_neurons))
+        sources = nest.GetStatus(conn_tuple, 'source')
+        targets = nest.GetStatus(conn_tuple, 'target')
+        weights = nest.GetStatus(conn_tuple, 'weight')
+
+        counter = 0
+        for i, j in zip(sources, targets):
+            self.adj_matrix[i-1][j-1] = weights[counter]
+            counter += 1
+
+    def save_data(self):
         
+        name_time = f"{self.sim_params['sim_time']:.1e}".replace('+', '').replace('.', '')
+        name_prefix = f"N{self.N_neurons}-" + name_time
+        with h5py.File('spikes-'+name_prefix+'.hdf5', 'w') as f:
+            f.create_dataset('spikes_trains', data=self.spikes_trains)
 
-        self.end_setup = time.time()
+        np.save("connectivity-"+name_prefix, self.adj_matrix)
 
-
-        nest.Connect(self.nodes_ex, self.nodes_ex, conn_spec={'rule': 'pairwise_bernoulli', 'p': self.network_params['epsilon']}, syn_spec="excitatory")
-        nest.Connect(self.nodes_ex, self.nodes_in, conn_spec={'rule': 'pairwise_bernoulli', 'p': self.network_params['epsilon']}, syn_spec="excitatory")
-        nest.Connect(self.nodes_in, self.nodes_ex, conn_spec={'rule': 'pairwise_bernoulli', 'p': self.network_params['epsilon']}, syn_spec="inhibitory")
-        nest.Connect(self.nodes_in, self.nodes_in, conn_spec={'rule': 'pairwise_bernoulli', 'p': self.network_params['epsilon']}, syn_spec="inhibitory")
-        nest.Connect(self.nodes_ex + self.nodes_in, self.sp_detector, syn_spec="excitatory")
-        ne
+    def raster(self):
+        nest.raster_plot.from_device(self.raster_exc, hist=True, hist_binwidth=.5)
+        nest.raster_plot.from_device(self.raster_inh, hist=True, hist_binwidth=.5)
+        plt.show()
