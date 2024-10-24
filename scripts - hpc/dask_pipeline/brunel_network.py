@@ -32,9 +32,6 @@ class BrunelNetwork:
         self.spikes_trains = None
         self.adj_matrix = None
 
-        self.strat_setup = None
-        self.end_setup = None
-
     
     def ext_input(self):
 

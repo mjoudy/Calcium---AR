@@ -27,7 +27,7 @@ import h5py
 ##NE = 4 * order  # number of excitatory neurons
 ##NI = 1 * order  # number of inhibitory neurons
 ##N_neurons = NE + NI  # number of neurons in total
-N_rec = 50  # record from 50 neurons
+##N_rec = 50  # record from 50 neurons
 
 ##CE = int(epsilon * NE)  # number of excitatory synapses per neuron
 ##CI = int(epsilon * NI)  # number of inhibitory synapses per neuron
@@ -83,10 +83,10 @@ neuron_test = nest.Create("iaf_psc_delta", 1)
 
 ###### !!!!!!! ########
 
-nest.CopyModel("static_synapse", "excitatory",
-               {"weight": J_ex, "delay": delay})
-nest.CopyModel("static_synapse", "inhibitory",
-               {"weight": J_in, "delay": delay})
+##nest.CopyModel("static_synapse", "excitatory",
+##               {"weight": J_ex, "delay": delay})
+##nest.CopyModel("static_synapse", "inhibitory",
+##               {"weight": J_in, "delay": delay})
 
 ##nest.Connect(noise, nodes_ex, syn_spec="excitatory")
 ##nest.Connect(noise, nodes_in, syn_spec="excitatory")
@@ -116,57 +116,57 @@ print("Inhibitory connections")
 endbuild = time.time()
 print("Simulating")
 
-nest.Simulate(simtime)
+##nest.Simulate(simtime)
 
-endsimulate = time.time()
+##endsimulate = time.time()
 
-events_ex = nest.GetStatus(espikes, "n_events")[0]
-events_in = nest.GetStatus(ispikes, "n_events")[0]
+##events_ex = nest.GetStatus(espikes, "n_events")[0]
+##events_in = nest.GetStatus(ispikes, "n_events")[0]
 
-rate_ex = events_ex / simtime * 1000.0 / N_rec
-rate_in = events_in / simtime * 1000.0 / N_rec
+##rate_ex = events_ex / simtime * 1000.0 / N_rec
+##rate_in = events_in / simtime * 1000.0 / N_rec
 
-num_synapses = (nest.GetDefaults("excitatory")["num_connections"] +
-                nest.GetDefaults("inhibitory")["num_connections"])
+##num_synapses = (nest.GetDefaults("excitatory")["num_connections"] +
+##                nest.GetDefaults("inhibitory")["num_connections"])
 
 build_time = endbuild - startbuild
-sim_time = endsimulate - endbuild
+##sim_time = endsimulate - endbuild
 
-print("Brunel network simulation (Python)")
-print("Number of neurons : {0}".format(N_neurons))
-print("Number of synapses: {0}".format(num_synapses))
-print("       Exitatory  : {0}".format(int(CE * N_neurons) + N_neurons))
-print("       Inhibitory : {0}".format(int(CI * N_neurons)))
-print("Excitatory rate   : %.2f Hz" % rate_ex)
-print("Inhibitory rate   : %.2f Hz" % rate_in)
-print("Building time     : %.2f s" % build_time)
-print("Simulation time   : %.2f s" % sim_time)
+##print("Brunel network simulation (Python)")
+##print("Number of neurons : {0}".format(N_neurons))
+##print("Number of synapses: {0}".format(num_synapses))
+##print("       Exitatory  : {0}".format(int(CE * N_neurons) + N_neurons))
+##print("       Inhibitory : {0}".format(int(CI * N_neurons)))
+##print("Excitatory rate   : %.2f Hz" % rate_ex)
+##print("Inhibitory rate   : %.2f Hz" % rate_in)
+##print("Building time     : %.2f s" % build_time)
+##print("Simulation time   : %.2f s" % sim_time)
 
-sp_detector_data = nest.GetStatus(sp_detector, "events")[0]
-sp_times = sp_detector_data["times"]
-sp_senders = sp_detector_data["senders"]
+##sp_detector_data = nest.GetStatus(sp_detector, "events")[0]
+##sp_times = sp_detector_data["times"]
+##sp_senders = sp_detector_data["senders"]
 
 #Get Connectivity matrix
-conn_tuple = nest.GetConnections(source= nodes_ex+nodes_in, target=nodes_ex+nodes_in)
+##conn_tuple = nest.GetConnections(source= nodes_ex+nodes_in, target=nodes_ex+nodes_in)
 
-conn_matrix = np.zeros((N_neurons, N_neurons))
+##conn_matrix = np.zeros((N_neurons, N_neurons))
 
-sources = nest.GetStatus(conn_tuple, 'source')
-targets = nest.GetStatus(conn_tuple, 'target')
-weights = nest.GetStatus(conn_tuple, 'weight')
+##sources = nest.GetStatus(conn_tuple, 'source')
+##targets = nest.GetStatus(conn_tuple, 'target')
+##weights = nest.GetStatus(conn_tuple, 'weight')
 
-counter = 0
+##counter = 0
 
-for i, j in zip(sources, targets):
-    conn_matrix[j-1, i-1] = weights[counter]
-    counter+=1
+##for i, j in zip(sources, targets):
+##    conn_matrix[j-1, i-1] = weights[counter]
+##    counter+=1
     
-np.save("connectivity-60e6-ms", conn_matrix)
+##np.save("connectivity-60e6-ms", conn_matrix)
 
-spikes = np.histogram2d(sp_senders, sp_times, bins=[range(1, 1252), np.arange(0, simtime+1, 1)])[0]
+##spikes = np.histogram2d(sp_senders, sp_times, bins=[range(1, 1252), np.arange(0, simtime+1, 1)])[0]
 
 #np.save("spikes-60e6-ms", spikes)
 #np.shape(spikes)
 
-with h5py.File('your_array_no_chunks.hdf5', 'w') as f:
-    f.create_dataset('large_array', data=spikes)
+##with h5py.File('your_array_no_chunks.hdf5', 'w') as f:
+##    f.create_dataset('large_array', data=spikes)
