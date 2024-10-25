@@ -133,7 +133,8 @@ class BrunelNetwork:
         sp_detector_data = nest.GetStatus(self.sp_detector, keys="events")[0]
         sp_times = sp_detector_data["times"]
         sp_senders = sp_detector_data["senders"]
-        self.spikes_trains = np.histogram2d(sp_senders, sp_times, bins=[range(1, self.N_neurons), np.arange(0, self.sim_params['sim_length']+1, 1)])[0]
+        self.spikes_trains = np.histogram2d(sp_senders, sp_times, bins=[range(1, self.N_neurons+2), np.arange(0, self.sim_params['sim_length']+1, 1)])[0]
+        print(self.spikes_trains.shape)
 
         '''
         self.multimeter_data_E = nest.GetStatus(self.multimeter_network_E, keys="events")[0]
@@ -162,11 +163,12 @@ class BrunelNetwork:
         
         name_time = f"{self.sim_params['sim_length']:.1e}".replace('+', '').replace('.', '')
         name_prefix = f"N{self.N_neurons}-T" + name_time
-        name_spikes = "spikes-"+name_prefix+".hdf5"
+        name_spikes = "spikes-"+name_prefix+".h5"
         name_adj = "connectivity-"+name_prefix+".npy"
 
         with h5py.File(name_spikes, 'w') as f:
             f.create_dataset('spikes_trains', data=self.spikes_trains)
+            f.close()
 
         np.save(name_adj, self.adj_matrix)
 
@@ -176,3 +178,6 @@ class BrunelNetwork:
         nest.raster_plot.from_device(self.raster_exc, hist=True, hist_binwidth=.5)
         nest.raster_plot.from_device(self.raster_inh, hist=True, hist_binwidth=.5)
         plt.show()
+
+    #def reset(self):
+     #   nest.ResetKernel()
