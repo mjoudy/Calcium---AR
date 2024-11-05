@@ -49,7 +49,7 @@ def dask_smooth(signal, win_len=5):
     smooth_cal = sig.savgol_filter(signal, window_length=win_len, deriv=0, delta=1., polyorder=3)
     smooth_deriv = sig.savgol_filter(signal, window_length=win_len, deriv=1, delta=1., polyorder=3)
 
-    return smooth_deriv
+    return smooth_cal, smooth_deriv
 
 
 def sim_calcium(spikes, tau=100, neuron_id=500):
@@ -152,6 +152,30 @@ def cut_spikes(spikes, signal, deriv, win_len=5):
     deriv = np.delete(deriv, remove_index)
 
     return signal, deriv
+
+
+def dask_cut_spikes(spikes, signal, deriv, win_len=5):
+    # Use np.all to check if all elements are either 0 or 1
+    bool_check = np.all((spikes == 0) | (spikes == 1))
+
+    if bool_check:
+        event_spikes = np.where(spikes)[0]
+    else:
+        event_spikes = spikes.astype(int)
+
+    remove_index = []
+    for i in event_spikes:
+        remove_index.append(np.arange(i - win_len, i + win_len))
+    
+    remove_index = np.array(remove_index).flatten()
+    remove_index = remove_index[remove_index > 0]
+    remove_index = remove_index[remove_index < len(signal)]
+
+    signal = np.delete(signal, remove_index)
+    deriv = np.delete(deriv, remove_index)
+
+    return signal, deriv
+
 
 
 '''

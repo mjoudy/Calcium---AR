@@ -49,7 +49,87 @@ def dask_smooth(signal, win_len=5):
     smooth_cal = sig.savgol_filter(signal, window_length=win_len, deriv=0, delta=1., polyorder=3)
     smooth_deriv = sig.savgol_filter(signal, window_length=win_len, deriv=1, delta=1., polyorder=3)
 
-    return smooth_deriv
+    return smooth_cal, smooth_deriv
+
+def dask_cut_spikes(spikes, signal, deriv, win_len=5):
+    # Use np.all to check if all elements are either 0 or 1
+    bool_check = np.all((spikes == 0) | (spikes == 1))
+
+    if bool_check:
+        event_spikes = np.where(spikes)[0]
+    else:
+        event_spikes = spikes.astype(int)
+
+    remove_index = []
+    for i in event_spikes:
+        remove_index.append(np.arange(i - win_len, i + win_len))
+    
+    remove_index = np.array(remove_index).flatten()
+    remove_index = remove_index[remove_index > 0]
+    remove_index = remove_index[remove_index < len(signal)]
+
+    signal = np.delete(signal, remove_index)
+    deriv = np.delete(deriv, remove_index)
+
+    return signal, deriv
+
+
+def dask_smooth_and_cut_spikes(signal, spikes, win_len=5):
+    # Check if `signal` and `spikes` have the same number of columns
+    if signal.shape[1] != spikes.shape[1]:
+        spikes = spikes[:, -signal.shape[1]:]  # Cut columns from the beginning of spikes if needed
+
+    # Initialize arrays
+    num_rows, num_cols = signal.shape
+    feed = np.zeros((num_rows, num_cols))
+    b_pure_fits = np.zeros(num_rows)
+
+    # Process each row separately
+    for row in range(num_rows):
+        # Smooth the signal and its derivative for the current row
+        smooth_cal = sig.savgol_filter(signal[row], window_length=win_len, deriv=0, delta=1., polyorder=3)
+        smooth_deriv = sig.savgol_filter(signal[row], window_length=win_len, deriv=1, delta=1., polyorder=3)
+        
+        # Identify spikes and the surrounding indices to remove
+        bool_check = np.all((spikes[row] == 0) | (spikes[row] == 1))
+        if bool_check:
+            event_spikes = np.where(spikes[row])[0]
+        else:
+            event_spikes = spikes[row].astype(int)
+
+        remove_index = []
+        for i in event_spikes:
+            remove_index.extend(np.arange(i - win_len, i + win_len))
+        
+        remove_index = np.array(remove_index)
+        remove_index = remove_index[(remove_index >= 0) & (remove_index < num_cols)]
+
+        # Remove indices from smooth_cal and smooth_deriv for fitting purposes
+        smooth_cal_nosp = np.delete(smooth_cal, remove_index)
+        smooth_deriv_nosp = np.delete(smooth_deriv, remove_index)
+
+        # Fit a line to the modified arrays and store b_pure_fit for the row
+        if smooth_cal_nosp.size > 1:  # Ensure there's enough data for fitting
+            b_pure_fit, _ = np.polyfit(smooth_cal_nosp, smooth_deriv_nosp, deg=1)
+            b_pure_fits[row] = 1/b_pure_fit
+        else:
+            b_pure_fits[row] = 0  # Default value if fitting is not possible
+
+        # Calculate feed for this row
+        feed[row, :] = -b_pure_fits[row] * smooth_cal + smooth_deriv
+
+    print(f"b_pure_fits: {b_pure_fits}")
+
+    return feed, b_pure_fits
+
+def dask_smooth_and_cut_spikes_feed(signal, spikes, win_len=5):
+    feed, _ = dask_smooth_and_cut_spikes(signal, spikes, win_len)
+    return feed
+
+def dask_smooth_and_cut_spikes_b_pure_fits(signal, spikes, win_len=5):
+    _, b_pure_fits = dask_smooth_and_cut_spikes(signal, spikes, win_len)
+    return b_pure_fits
+
 
 
 def sim_calcium(spikes, tau=100, neuron_id=500):

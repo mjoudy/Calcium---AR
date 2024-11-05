@@ -158,6 +158,45 @@ class BrunelNetwork:
 
         return self.spikes_trains, self.adj_matrix
     
+    def record_data_incrementally(self, batch_size=1000):
+        sp_detector_data = nest.GetStatus(self.sp_detector, keys="events")[0]
+        sp_times = sp_detector_data["times"]
+        sp_senders = sp_detector_data["senders"]
+
+        # Define histogram bins based on neuron count and time resolution
+        histogram_bins = [range(1, self.N_neurons + 2), np.arange(0, self.sim_params['sim_length'] + 1, 1)]
+        spike_histogram = np.zeros((self.N_neurons, len(histogram_bins[1]) - 1))
+
+        # Define file for saving incremental data
+        name_spikes = "spikes_incremental.hdf5"
+        with h5py.File(name_spikes, 'w') as f:
+            spikes_dset = f.create_dataset(
+                "spikes", (0, 2), maxshape=(None, 2), dtype='float32'
+            )
+
+            # Process data in batches and update the histogram
+            for start in range(0, len(sp_times), batch_size):
+                end = min(start + batch_size, len(sp_times))
+                batch_senders = sp_senders[start:end]
+                batch_times = sp_times[start:end]
+
+                # Update histogram incrementally with current batch
+                hist_batch, _, _ = np.histogram2d(batch_senders, batch_times, bins=histogram_bins)
+                spike_histogram += hist_batch  # Incrementally add to the histogram
+
+                # Save the batch spike data in raw form as well
+                batch_data = np.column_stack((batch_senders, batch_times))
+                spikes_dset.resize(spikes_dset.shape[0] + batch_data.shape[0], axis=0)
+                spikes_dset[-batch_data.shape[0]:] = batch_data
+
+        # Save the final spike histogram as a separate dataset in the HDF5 file
+        with h5py.File(name_spikes, 'a') as f:
+            f.create_dataset('spike_histogram', data=spike_histogram)
+
+        print(f"Spike data saved incrementally to {name_spikes}")
+        return name_spikes
+
+    
 
     def save_data(self):
         
