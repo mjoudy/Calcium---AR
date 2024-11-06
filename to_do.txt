@@ -8,3 +8,8 @@
 
 - notebooks should be organized for comprehension
 
+- git/github for bwunicluster
+- vscode connection to bwunicluster slurm
+
+
+
