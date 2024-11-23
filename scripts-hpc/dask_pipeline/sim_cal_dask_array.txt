@@ -1,0 +1,11 @@
+/home/fr/fr_fr/fr_mj200/.conda/envs/phd_conda/lib/python3.12/site-packages/zarr/creation.py:614: UserWarning: ignoring keyword argument 'read_only'
+  compressor, fill_value = _kwargs_compat(compressor, fill_value, kwargs)
+Spikes address: /pfs/work7/workspace/scratch/fr_mj200-phd_project/Calcium---AR/scripts-hpc/dask_pipeline/data/spikes-N1250-T10e06.zarr
+SLURMCluster(d8355e28, 'tcp://10.0.2.10:36725', workers=0, threads=0, memory=0 B)
+<Client: 'tcp://10.0.2.10:36725' processes=0 threads=0, memory=0 B>
+dask.array<from-zarr, shape=(1250, 1000000), dtype=float64, chunksize=(20, 31250), chunktype=numpy.ndarray>
+Shape: (1250, 1000000)
+Chunks: ((20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 10), (31250, 31250, 31250, 31250, 31250, 31250, 31250, 31250, 31250, 31250, 31250, 31250, 31250, 31250, 31250, 31250, 31250, 31250, 31250, 31250, 31250, 31250, 31250, 31250, 31250, 31250, 31250, 31250, 31250, 31250, 31250, 31250))
+Data type: float64
+/pfs/work7/workspace/scratch/fr_mj200-phd_project/Calcium---AR/scripts-hpc/dask_pipeline/data/calcium-N1250-T10e06-tau3000.0.zarr
+Processed data saved to /pfs/work7/workspace/scratch/fr_mj200-phd_project/Calcium---AR/scripts-hpc/dask_pipeline/data/calcium-N1250-T10e06-tau3000.0.zarr

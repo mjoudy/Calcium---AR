@@ -9,3 +9,6 @@ envs/
 *.npy
 *.h5
 *.hdf5
+*.zarr
+
+scripts-hpc/dask_pipeline/logs/

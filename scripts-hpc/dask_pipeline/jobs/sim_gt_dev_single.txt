@@ -1,0 +1,41 @@
+Project directory (one level up) is: /pfs/work7/workspace/scratch/fr_mj200-phd_project/Calcium---AR/scripts-hpc/dask_pipeline
+Python script path is: /pfs/work7/workspace/scratch/fr_mj200-phd_project/Calcium---AR/scripts-hpc/dask_pipeline/sim_ground_truth.py
+
+              -- N E S T --
+  Copyright (C) 2004 The NEST Initiative
+
+ Version: 3.8.0
+ Built: Aug 27 2024 04:33:06
+
+ This program is provided AS IS and comes with
+ NO WARRANTY. See the file LICENSE for details.
+
+ Problems or suggestions?
+   Visit https://www.nest-simulator.org
+
+ Type 'nest.help()' to find out more about NEST.
+
+Running Brunel Network Simulation...
+Traceback (most recent call last):
+  File "/pfs/work7/workspace/scratch/fr_mj200-phd_project/Calcium---AR/scripts-hpc/dask_pipeline/sim_ground_truth.py", line 16, in <module>
+    ground_truth = bn.BrunelNetwork()
+                   ^^^^^^^^^^^^^^^^^^
+  File "/pfs/work7/workspace/scratch/fr_mj200-phd_project/Calcium---AR/scripts-hpc/dask_pipeline/brunel_network.py", line 24, in __init__
+    with open(config_file, 'r') as f:
+         ^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: 'network_config.json'
+
+============================= JOB FEEDBACK =============================
+
+NodeName=uc2n521
+Job ID: 24668552
+Cluster: uc2
+User/Group: fr_mj200/fr_fr
+State: FAILED (exit code 1)
+Nodes: 1
+Cores per node: 80
+CPU Utilized: 00:00:03
+CPU Efficiency: 0.03% of 02:24:00 core-walltime
+Job Wall-clock time: 00:01:48
+Memory Utilized: 129.81 MB
+Memory Efficiency: 0.08% of 160.00 GB
