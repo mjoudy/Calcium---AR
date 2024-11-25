@@ -35,7 +35,7 @@ def dask_calcium(spikes, tau=100):
     return calcium_nsp_noisy
 
 
-def dask_pre_process(signal, spikes, win_len=5):
+def dask_pre_process(signal, spikes, win_len=5, sg_delta=31):
     # Check if `signal` and `spikes` have the same number of columns
     if signal.shape[1] != spikes.shape[1]:
         spikes = spikes[:, -signal.shape[1]:]  # Cut columns from the beginning of spikes if needed
@@ -48,8 +48,8 @@ def dask_pre_process(signal, spikes, win_len=5):
     # Process each row separately
     for row in range(num_rows):
         # Smooth the signal and its derivative for the current row
-        smooth_cal = sig.savgol_filter(signal[row], window_length=win_len, deriv=0, delta=1., polyorder=3)
-        smooth_deriv = sig.savgol_filter(signal[row], window_length=win_len, deriv=1, delta=1., polyorder=3)
+        smooth_cal = sig.savgol_filter(signal[row], window_length=win_len, deriv=0, delta=sg_delta, polyorder=3)
+        smooth_deriv = sig.savgol_filter(signal[row], window_length=win_len, deriv=1, delta=sg_delta, polyorder=3)
         
         # Identify spikes and the surrounding indices to remove
         bool_check = np.all((spikes[row] == 0) | (spikes[row] == 1))
@@ -82,11 +82,11 @@ def dask_pre_process(signal, spikes, win_len=5):
     return feed, b_pure_fits
 
 
-def dask_feed_raper(signal, spikes, win_len=5):
-    feed, _ = dask_pre_process(signal, spikes, win_len)
+def dask_feed_raper(signal, spikes, win_len=5, sg_delta=31):
+    feed, _ = dask_pre_process(signal, spikes, win_len, sg_delta)
     return feed
 
-def dask_fits_raper(signal, spikes, win_len=5):
-    _, b_pure_fits = dask_pre_process(signal, spikes, win_len)
+def dask_fits_raper(signal, spikes, win_len=5, sg_delta=31):
+    _, b_pure_fits = dask_pre_process(signal, spikes, win_len, sg_delta)
     return b_pure_fits
 

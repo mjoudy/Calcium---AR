@@ -6,7 +6,7 @@ import numpy as np
 import dask.array as da
 from dask_jobqueue.slurm import SLURMCluster
 from dask.distributed import Client
-from functions import calsim as cs
+from functions import dask_functions as df
 from functions import utils as ut
 
 def main(calcium_signal, sg_delta):
@@ -18,8 +18,8 @@ def main(calcium_signal, sg_delta):
     print(f"Shape: {dask_calcium.shape}")
     print(f"Chunks: {dask_calcium.chunks}")
     print(f"Data type: {dask_calcium.dtype}")
-    
-    pre_processed = dask_calcium.map_blocks(cs.dask_pre_process, sg_delta, dtype=np.float64)
+    #here should I add spikes argument
+    preprocessed_feed = dask_calcium.map_blocks(df.dask_feed_raper, sg_delta, dtype=np.float64)
     
     # Use the updated nameit function
     input_file_name = os.path.basename(calcium_signal)
