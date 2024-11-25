@@ -3,7 +3,7 @@ import json
 #This function has been created to avoid confiosion of files durind mass experiments.
 #One can use it to name files in a way that is easy to understand and identify parameters space and stages of the job(spikes, calcium, preprocessed, ...).
 #this function can be easily updated by adding more arguments as parameters of different stages. 
-def nameit(replacement, **kwargs):
+def nameit_old(replacement, **kwargs):
     with open('temp_names.json', 'r') as file:
         file_names = json.load(file)
         sp_name = file_names['sp_file']
@@ -16,4 +16,34 @@ def nameit(replacement, **kwargs):
 
     modified_name += '.zarr'
     return modified_name
+
+
+# Generalized nameit function with '-' as the separator
+def nameit(input_file, replacement, **kwargs):
+    """
+    Generate a modified file name by replacing the first word of the base name.
+
+    Parameters:
+        input_file (str): The input file name.
+        replacement (str): The replacement for the first word in the base name.
+        kwargs: Additional parameters to append to the file name.
+
+    Returns:
+        str: The modified file name.
+    """
+    base_name, ext = input_file.rsplit('.zarr', 1)
+    parts = base_name.split('-', 1)  # Split at the first '-'
+    if len(parts) > 1:
+        # Replace the first word
+        modified_name = f"{replacement}-{parts[1]}"
+    else:
+        # If no '-', replace the entire name
+        modified_name = replacement
+
+    for key, value in kwargs.items():
+        modified_name += f"-{key}{value}"
+
+    modified_name += '.zarr'
+    return modified_name
+
         

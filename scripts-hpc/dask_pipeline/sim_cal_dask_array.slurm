@@ -14,6 +14,9 @@ module load devel/miniconda
 module load compiler/gnu/8.5.0
 conda activate phd_conda
 
+PROJECT_DIR=${PROJECT_DIR:-$(pwd)}  # Use $PROJECT_DIR if set, else current directory
+INPUT_FILE="$PROJECT_DIR/data/spikes-N1250-T10e06.zarr"
+
 TAU_VALUES=(1 10 20 50 100 200 500 1000 2000 3000)
 INDEX=$SLURM_ARRAY_TASK_ID
 TAU=${TAU_VALUES[$INDEX]}
