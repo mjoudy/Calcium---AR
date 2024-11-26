@@ -9,7 +9,7 @@ from dask.distributed import Client
 from functions import dask_functions as df
 from functions import utils as ut
 
-def main(calcium_signal, spikes_trains, sg_delta):
+def main(calcium_signal, spikes_trains, win_len, sg_win):
     """
     Main function to preprocess the calcium signal.
     """
@@ -20,19 +20,19 @@ def main(calcium_signal, spikes_trains, sg_delta):
     print(f"Data type: {dask_calcium.dtype}")
     
     dask_spikes = da.from_zarr(spikes_trains)
-    preprocessed_feed = dask_calcium.map_blocks(df.dask_feed_raper, dask_spikes, sg_delta, dtype=np.float64)
-    slopes = dask_calcium.map_blocks(df.dask_fits_raper, dask_spikes, sg_delta, dtype=np.float64)
+    preprocessed_feed = dask_calcium.map_blocks(df.dask_feed_raper, dask_spikes, win_len, sg_win, dtype=np.float64)
+    slopes = dask_calcium.map_blocks(df.dask_fits_raper, dask_spikes, win_len, sg_win, dtype=np.float64)
     
     # Use the updated nameit function
     input_file_name = os.path.basename(calcium_signal)
-    output_name_feed = ut.nameit(input_file_name, "pre_processed", sg_delta=sg_delta)
+    output_name_feed = ut.nameit(input_file_name, "pre_processed", sg_win=sg_win)
     output_zarr_file = os.path.join(os.getcwd(), "data", output_name_feed)
     print(output_zarr_file)
     
     preprocessed_feed.to_zarr(output_zarr_file, overwrite=True)
     print(f"Processed data saved to {output_zarr_file}")
 
-    output_name_slopes = ut.nameit(input_file_name, "slopes", sg_delta=sg_delta)
+    output_name_slopes = ut.nameit(input_file_name, "slopes", sg_win=sg_win)
     output_zarr_file_slopes = os.path.join(os.getcwd(), "data", output_name_slopes)
     print(output_zarr_file_slopes)
     slopes.to_zarr(output_zarr_file_slopes, overwrite=True)
@@ -46,7 +46,7 @@ if __name__ == "__main__":
     # Read arguments
     calcium_signal = sys.argv[1]
     spikes_trains = sys.argv[2]
-    sg_delta = float(sys.argv[3])
+    sg_win = float(sys.argv[3])
 
     print(f"Calcium signal address: {calcium_signal}")
     
@@ -67,4 +67,4 @@ if __name__ == "__main__":
     print(client)
     
     # Run the main function
-    main(calcium_signal, spikes_trains, sg_delta)
+    main(calcium_signal, spikes_trains, sg_win)
