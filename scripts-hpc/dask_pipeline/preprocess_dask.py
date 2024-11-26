@@ -9,7 +9,7 @@ from dask.distributed import Client
 from functions import dask_functions as df
 from functions import utils as ut
 
-def main(calcium_signal, sg_delta):
+def main(calcium_signal, spikes_trains, sg_delta):
     """
     Main function to preprocess the calcium signal.
     """
@@ -18,26 +18,35 @@ def main(calcium_signal, sg_delta):
     print(f"Shape: {dask_calcium.shape}")
     print(f"Chunks: {dask_calcium.chunks}")
     print(f"Data type: {dask_calcium.dtype}")
-    #here should I add spikes argument
-    preprocessed_feed = dask_calcium.map_blocks(df.dask_feed_raper, sg_delta, dtype=np.float64)
+    
+    dask_spikes = da.from_zarr(spikes_trains)
+    preprocessed_feed = dask_calcium.map_blocks(df.dask_feed_raper, dask_spikes, sg_delta, dtype=np.float64)
+    slopes = dask_calcium.map_blocks(df.dask_fits_raper, dask_spikes, sg_delta, dtype=np.float64)
     
     # Use the updated nameit function
     input_file_name = os.path.basename(calcium_signal)
-    output_name = ut.nameit(input_file_name, "pre_processed", sg_delta=sg_delta)
-    output_zarr_file = os.path.join(os.getcwd(), "data", output_name)
+    output_name_feed = ut.nameit(input_file_name, "pre_processed", sg_delta=sg_delta)
+    output_zarr_file = os.path.join(os.getcwd(), "data", output_name_feed)
     print(output_zarr_file)
     
-    pre_processed.to_zarr(output_zarr_file, overwrite=True)
+    preprocessed_feed.to_zarr(output_zarr_file, overwrite=True)
     print(f"Processed data saved to {output_zarr_file}")
 
+    output_name_slopes = ut.nameit(input_file_name, "slopes", sg_delta=sg_delta)
+    output_zarr_file_slopes = os.path.join(os.getcwd(), "data", output_name_slopes)
+    print(output_zarr_file_slopes)
+    slopes.to_zarr(output_zarr_file_slopes, overwrite=True)
+    print(f"Slopes data saved to {output_zarr_file_slopes}")
+
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
+    if len(sys.argv) != 4:
         print("Usage: python script.py <calcium_signal_path> <sg_delta>")
         sys.exit(1)
 
     # Read arguments
     calcium_signal = sys.argv[1]
-    sg_delta = float(sys.argv[2])
+    spikes_trains = sys.argv[2]
+    sg_delta = float(sys.argv[3])
 
     print(f"Calcium signal address: {calcium_signal}")
     
@@ -58,4 +67,4 @@ if __name__ == "__main__":
     print(client)
     
     # Run the main function
-    main(calcium_signal, sg_delta)
+    main(calcium_signal, spikes_trains, sg_delta)
