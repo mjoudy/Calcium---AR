@@ -1,0 +1,63 @@
+/home/fr/fr_fr/fr_mj200/.conda/envs/phd_conda/lib/python3.12/site-packages/zarr/creation.py:614: UserWarning: ignoring keyword argument 'read_only'
+  compressor, fill_value = _kwargs_compat(compressor, fill_value, kwargs)
+Calcium signal address: /pfs/work7/workspace/scratch/fr_mj200-phd_project/Calcium---AR/scripts-hpc/dask_pipeline/data/calcium-N1250-T10e06-tau50.0.zarr
+SLURMCluster(0d30fb4a, 'tcp://10.0.2.9:45017', workers=0, threads=0, memory=0 B)
+<Client: 'tcp://10.0.2.9:45017' processes=0 threads=0, memory=0 B>
+dask.array<from-zarr, shape=(1250, 1000000), dtype=float64, chunksize=(20, 31250), chunktype=numpy.ndarray>
+Shape: (1250, 1000000)
+Chunks: ((20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 10), (31250, 31250, 31250, 31250, 31250, 31250, 31250, 31250, 31250, 31250, 31250, 31250, 31250, 31250, 31250, 31250, 31250, 31250, 31250, 31250, 31250, 31250, 31250, 31250, 31250, 31250, 31250, 31250, 31250, 31250, 31250, 31250))
+Data type: float64
+/pfs/work7/workspace/scratch/fr_mj200-phd_project/Calcium---AR/scripts-hpc/dask_pipeline/data/pre_processed-N1250-T10e06-tau50.0-sg_delta1.0.zarr
+Traceback (most recent call last):
+  File "/pfs/work7/workspace/scratch/fr_mj200-phd_project/Calcium---AR/scripts-hpc/dask_pipeline/preprocess_dask.py", line 70, in <module>
+    main(calcium_signal, spikes_trains, sg_delta)
+  File "/pfs/work7/workspace/scratch/fr_mj200-phd_project/Calcium---AR/scripts-hpc/dask_pipeline/preprocess_dask.py", line 32, in main
+    preprocessed_feed.to_zarr(output_zarr_file, overwrite=True)
+  File "/home/fr/fr_fr/fr_mj200/.conda/envs/phd_conda/lib/python3.12/site-packages/dask/array/core.py", line 2965, in to_zarr
+    return to_zarr(self, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fr/fr_fr/fr_mj200/.conda/envs/phd_conda/lib/python3.12/site-packages/dask/array/core.py", line 3769, in to_zarr
+    return arr.store(z, lock=False, compute=compute, return_stored=return_stored)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fr/fr_fr/fr_mj200/.conda/envs/phd_conda/lib/python3.12/site-packages/dask/array/core.py", line 1764, in store
+    r = store([self], [target], **kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fr/fr_fr/fr_mj200/.conda/envs/phd_conda/lib/python3.12/site-packages/dask/array/core.py", line 1232, in store
+    compute_as_if_collection(Array, store_dsk, map_keys, **kwargs)
+  File "/home/fr/fr_fr/fr_mj200/.conda/envs/phd_conda/lib/python3.12/site-packages/dask/base.py", line 397, in compute_as_if_collection
+    return schedule(dsk2, keys, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fr/fr_fr/fr_mj200/.conda/envs/phd_conda/lib/python3.12/site-packages/distributed/client.py", line 3483, in get
+    results = self.gather(packed, asynchronous=asynchronous, direct=direct)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fr/fr_fr/fr_mj200/.conda/envs/phd_conda/lib/python3.12/site-packages/distributed/client.py", line 2556, in gather
+    return self.sync(
+           ^^^^^^^^^^
+  File "/pfs/work7/workspace/scratch/fr_mj200-phd_project/Calcium---AR/scripts-hpc/dask_pipeline/functions/dask_functions.py", line 86, in dask_feed_raper
+    feed, _ = dask_pre_process(signal, spikes, win_len, sg_delta)
+      ^^^^^^^^^^^^^^^^^
+  File "/pfs/work7/workspace/scratch/fr_mj200-phd_project/Calcium---AR/scripts-hpc/dask_pipeline/functions/dask_functions.py", line 51, in dask_pre_process
+    smooth_cal = sig.savgol_filter(signal[row], window_length=win_len, deriv=0, delta=sg_delta, polyorder=3)
+  ^^^^^^^^^^^^^^^^^
+  File "/home/fr/fr_fr/fr_mj200/.conda/envs/phd_conda/lib/python3.12/site-packages/scipy/signal/_savitzky_golay.py", line 341, in savgol_filter
+    coeffs = savgol_coeffs(window_length, polyorder, deriv=deriv, delta=delta)
+      ^^^^^^^^^^^^^^^^^
+  File "/home/fr/fr_fr/fr_mj200/.conda/envs/phd_conda/lib/python3.12/site-packages/scipy/signal/_savitzky_golay.py", line 101, in savgol_coeffs
+    raise ValueError("polyorder must be less than window_length.")
+  ^^^^^^^^^^^^^^^^^
+ValueError: polyorder must be less than window_length.
+
+============================= JOB FEEDBACK =============================
+
+NodeName=uc2n521
+Job ID: 24876788
+Cluster: uc2
+User/Group: fr_mj200/fr_fr
+State: FAILED (exit code 1)
+Nodes: 1
+Cores per node: 2
+CPU Utilized: 00:00:06
+CPU Efficiency: 2.31% of 00:04:20 core-walltime
+Job Wall-clock time: 00:02:10
+Memory Utilized: 241.69 MB
+Memory Efficiency: 0.15% of 160.00 GB
