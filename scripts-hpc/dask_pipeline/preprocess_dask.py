@@ -9,10 +9,8 @@ from dask.distributed import Client
 from functions import dask_functions as df
 from functions import utils as ut
 
-def main(calcium_signal, spikes_trains, win_len, sg_win):
-    """
-    Main function to preprocess the calcium signal.
-    """
+def main_1(calcium_signal, spikes_trains, win_len, sg_win):
+    
     dask_calcium = da.from_zarr(calcium_signal)
     print(dask_calcium)
     print(f"Shape: {dask_calcium.shape}")
@@ -37,6 +35,32 @@ def main(calcium_signal, spikes_trains, win_len, sg_win):
     print(output_zarr_file_slopes)
     slopes.to_zarr(output_zarr_file_slopes, overwrite=True)
     print(f"Slopes data saved to {output_zarr_file_slopes}")
+
+def main(calcium_signal, spikes_trains, sg_win, win_len):
+    dask_calcium = da.from_zarr(calcium_signal)
+    dask_spikes = da.from_zarr(spikes_trains)
+
+    preprocessed_feed = da.map_blocks(
+        df.dask_feed_raper, dask_calcium, dask_spikes, win_len, sg_win, 
+        dtype=np.float64, chunks=dask_calcium.chunks
+    )
+    slopes = da.map_blocks(
+        df.dask_fits_raper, dask_calcium, dask_spikes, win_len, sg_win, 
+        dtype=np.float64, chunks=(dask_calcium.chunks[0],)
+    )
+    
+    # Original naming logic
+    input_file_name = os.path.basename(calcium_signal)
+    output_name_feed = ut.nameit(input_file_name, "pre_processed", sg_win=sg_win)
+    output_zarr_file_feed = os.path.join(os.getcwd(), "data", output_name_feed)
+    preprocessed_feed.to_zarr(output_zarr_file_feed, overwrite=True)
+    print(f"Processed feed data saved to {output_zarr_file_feed}")
+
+    output_name_slopes = ut.nameit(input_file_name, "slopes", sg_win=sg_win)
+    output_zarr_file_slopes = os.path.join(os.getcwd(), "data", output_name_slopes)
+    slopes.to_zarr(output_zarr_file_slopes, overwrite=True)
+    print(f"Slopes data saved to {output_zarr_file_slopes}")
+
 
 if __name__ == "__main__":
     if len(sys.argv) != 5:
