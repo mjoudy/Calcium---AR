@@ -39,14 +39,15 @@ def main(calcium_signal, spikes_trains, win_len, sg_win):
     print(f"Slopes data saved to {output_zarr_file_slopes}")
 
 if __name__ == "__main__":
-    if len(sys.argv) != 4:
+    if len(sys.argv) != 5:
         print("Usage: python script.py <calcium_signal_path> <sg_delta>")
         sys.exit(1)
 
     # Read arguments
     calcium_signal = sys.argv[1]
     spikes_trains = sys.argv[2]
-    sg_win = float(sys.argv[3])
+    sg_win =int(sys.argv[3])
+    win_len =int(sys.argv[4])
 
     print(f"Calcium signal address: {calcium_signal}")
     
@@ -67,4 +68,4 @@ if __name__ == "__main__":
     print(client)
     
     # Run the main function
-    main(calcium_signal, spikes_trains, sg_win)
+    main(calcium_signal, spikes_trains, sg_win, win_len)

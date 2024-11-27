@@ -35,7 +35,7 @@ def dask_calcium(spikes, tau=100):
     return calcium_nsp_noisy
 
 
-def dask_pre_process(signal, spikes, win_len=5, sg_win=31):
+def dask_pre_process(signal, spikes, sg_win=31, win_len=5):
     # Check if `signal` and `spikes` have the same number of columns
     if signal.shape[1] != spikes.shape[1]:
         spikes = spikes[:, -signal.shape[1]:]  # Cut columns from the beginning of spikes if needed

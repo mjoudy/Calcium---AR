@@ -23,10 +23,11 @@ INPUT_SPIKES="$PROJECT_DIR/data/spikes-N1250-T10e06.zarr"
 
 # Array of sg_delta values
 SG_WIN=31
+WIN_LEN=5
 
 # Get the current sg_delta value based on the SLURM array task ID
 # INDEX=$SLURM_ARRAY_TASK_ID
 # SG_DELTA=${SG_DELTA_VALUES[$INDEX]}
 
 # Run the preprocess_dask.py script with the input file and sg_delta value
-python preprocess_dask.py $INPUT_CALCIUM $INPUT_SPIKES $SG_WIN
+python preprocess_dask.py $INPUT_CALCIUM $INPUT_SPIKES $SG_WIN $WIN_LEN
