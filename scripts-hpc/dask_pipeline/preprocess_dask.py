@@ -27,16 +27,6 @@ def main(calcium_signal, spikes_trains, sg_win, win_len):
     preprocessed_feed.to_zarr(output_zarr_file_feed, overwrite=True)
     print(f"Processed feed data saved to {output_zarr_file_feed}")
 
-    b = da.map_blocks(df.dask_fits_raper, 
-        dask_calcium, dask_spikes, win_len, sg_win, 
-        dtype=np.float64
-    )
-    slopes = b.compute()
-    output_name_fit = ut.nameit(input_file_name, "slopes", sg_win=sg_win)
-    output_zarr_file_fit = os.path.join(os.getcwd(), "data", output_name_fit)
-    output_zarr_file_fit = output_zarr_file_fit.replace("zarr", "npy")
-    np.save(output_zarr_file_fit, slopes)
-
 
 
 if __name__ == "__main__":

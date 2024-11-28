@@ -18,7 +18,7 @@ def main(calcium_signal, spikes_trains, sg_win, win_len):
     
     input_file_name = os.path.basename(calcium_signal)
 
-    slopes = da.map_blocks(df.dask_fits_raper, 
+    slopes = da.map_blocks(df.dask_estimate_kernels, 
         dask_calcium, dask_spikes, win_len, sg_win, 
         dtype=np.float64
     )
