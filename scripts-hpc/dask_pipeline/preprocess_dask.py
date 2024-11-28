@@ -16,7 +16,7 @@ def main(calcium_signal, spikes_trains, sg_win, win_len):
     dask_calcium = da.from_zarr(calcium_signal, chunks=("auto", data_shape[1]))
     dask_spikes = da.from_zarr(spikes_trains, chunks=("auto", data_shape[1]))
 
-    preprocessed_feed = da.map_blocks(df.dask_feed_raper, 
+    preprocessed_feed = da.map_blocks(df.dask_preprocess, 
         dask_calcium, dask_spikes, win_len, sg_win, 
         dtype=np.float64
     )

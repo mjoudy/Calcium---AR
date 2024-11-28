@@ -1,7 +1,7 @@
 #!/bin/bash
 
-#SBATCH --job-name=preprocess_dask
-#SBATCH --output=preprocess_dask.txt
+#SBATCH --job-name=preprocess_kernels
+#SBATCH --output=preprocess_kernels.txt
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=1

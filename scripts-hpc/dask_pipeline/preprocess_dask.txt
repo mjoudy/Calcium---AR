@@ -1,8 +1,8 @@
 /home/fr/fr_fr/fr_mj200/.conda/envs/phd_conda/lib/python3.12/site-packages/zarr/creation.py:614: UserWarning: ignoring keyword argument 'read_only'
   compressor, fill_value = _kwargs_compat(compressor, fill_value, kwargs)
 Calcium signal address: /pfs/work7/workspace/scratch/fr_mj200-phd_project/Calcium---AR/scripts-hpc/dask_pipeline/data/calcium-N1250-T10e06-tau50.0.zarr
-SLURMCluster(89d7b698, 'tcp://10.0.2.9:46427', workers=0, threads=0, memory=0 B)
-<Client: 'tcp://10.0.2.9:46427' processes=0 threads=0, memory=0 B>
+SLURMCluster(5e308d4b, 'tcp://10.0.2.10:38407', workers=0, threads=0, memory=0 B)
+<Client: 'tcp://10.0.2.10:38407' processes=0 threads=0, memory=0 B>
 Traceback (most recent call last):
   File "/pfs/work7/workspace/scratch/fr_mj200-phd_project/Calcium---AR/scripts-hpc/dask_pipeline/preprocess_kernels.py", line 61, in <module>
     main(calcium_signal, spikes_trains, sg_win, win_len)
@@ -43,15 +43,15 @@ ValueError: parameter 'value': expected array with shape (16, 1000000), got (16,
 
 ============================= JOB FEEDBACK =============================
 
-NodeName=uc2n521
-Job ID: 24887929
+NodeName=uc2n522
+Job ID: 24890713
 Cluster: uc2
 User/Group: fr_mj200/fr_fr
 State: FAILED (exit code 1)
 Nodes: 1
 Cores per node: 2
 CPU Utilized: 00:00:06
-CPU Efficiency: 2.07% of 00:04:50 core-walltime
-Job Wall-clock time: 00:02:25
-Memory Utilized: 208.79 MB
+CPU Efficiency: 1.90% of 00:05:16 core-walltime
+Job Wall-clock time: 00:02:38
+Memory Utilized: 211.67 MB
 Memory Efficiency: 0.13% of 160.00 GB

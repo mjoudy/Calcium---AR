@@ -20,13 +20,12 @@ def main(calcium_signal, spikes_trains, sg_win, win_len):
 
     slopes = da.map_blocks(df.dask_estimate_kernels, 
         dask_calcium, dask_spikes, win_len, sg_win, 
-        dtype=np.float64
+        dtype=np.float64,
+        drop_axis=1
     )
-    #slopes = b.compute()
+    
     output_name_fit = ut.nameit(input_file_name, "kernels", sg_win=sg_win)
     output_zarr_file_fit = os.path.join(os.getcwd(), "data", output_name_fit)
-    #output_zarr_file_fit = output_zarr_file_fit.replace("zarr", "npy")
-    #np.save(output_zarr_file_fit, slopes)
     slopes.to_zarr(output_zarr_file_fit, overwrite=True)
 
 
