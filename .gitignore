@@ -12,3 +12,4 @@ envs/
 *.zarr
 
 scripts-hpc/dask_pipeline/logs/
+scripts-hpc/dask_pipeline/data/

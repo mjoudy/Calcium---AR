@@ -15,27 +15,19 @@ def main(calcium_signal, spikes_trains, sg_win, win_len):
     data_shape = z.shape
     dask_calcium = da.from_zarr(calcium_signal, chunks=("auto", data_shape[1]))
     dask_spikes = da.from_zarr(spikes_trains, chunks=("auto", data_shape[1]))
-
-    preprocessed_feed = da.map_blocks(df.dask_feed_raper, 
-        dask_calcium, dask_spikes, win_len, sg_win, 
-        dtype=np.float64
-    )
     
     input_file_name = os.path.basename(calcium_signal)
-    output_name_feed = ut.nameit(input_file_name, "pre_processed", sg_win=sg_win)
-    output_zarr_file_feed = os.path.join(os.getcwd(), "data", output_name_feed)
-    preprocessed_feed.to_zarr(output_zarr_file_feed, overwrite=True)
-    print(f"Processed feed data saved to {output_zarr_file_feed}")
 
-    b = da.map_blocks(df.dask_fits_raper, 
+    slopes = da.map_blocks(df.dask_fits_raper, 
         dask_calcium, dask_spikes, win_len, sg_win, 
         dtype=np.float64
     )
-    slopes = b.compute()
-    output_name_fit = ut.nameit(input_file_name, "slopes", sg_win=sg_win)
+    #slopes = b.compute()
+    output_name_fit = ut.nameit(input_file_name, "kernels", sg_win=sg_win)
     output_zarr_file_fit = os.path.join(os.getcwd(), "data", output_name_fit)
-    output_zarr_file_fit = output_zarr_file_fit.replace("zarr", "npy")
-    np.save(output_zarr_file_fit, slopes)
+    #output_zarr_file_fit = output_zarr_file_fit.replace("zarr", "npy")
+    #np.save(output_zarr_file_fit, slopes)
+    slopes.to_zarr(output_zarr_file_fit, overwrite=True)
 
 
 
