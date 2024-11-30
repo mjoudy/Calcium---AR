@@ -34,5 +34,5 @@ if __name__ == "__main__":
 
     signals = sys.argv[1]
     conn_matrix = sys.argv[2]
-    lag = sys.argv[3]
+    lag = int(sys.argv[3])
     main(signals, conn_matrix, lag)

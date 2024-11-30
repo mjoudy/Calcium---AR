@@ -37,7 +37,7 @@ def reconstructed_spikes(signal, deriv, cut_signal, cut_deriv):
 
 def conn_inf_LR(conn_matrix, signals, lag=10):
     
-    G = np.load(conn_matrix)
+    G = conn_matrix
     G = G - (np.diag(np.diag(G)))
 
     Y = signals[:, lag:]
