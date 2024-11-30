@@ -56,5 +56,3 @@ def monitor_cpu_usage():
     cpu_usage = process.cpu_percent(interval=1)  # Measure over a 1-second interval
     cpu_count = len(process.cpu_affinity())     # Get CPU affinity (available CPUs)
     return cpu_usage, cpu_count
-
-        
