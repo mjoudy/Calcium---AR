@@ -35,62 +35,6 @@ def dask_calcium(spikes, tau=100):
     return calcium_nsp_noisy
 
 
-def dask_pre_process_1(signal, spikes, sg_win=31, win_len=5):
-    # Check if `signal` and `spikes` have the same number of columns
-    if signal.shape[1] != spikes.shape[1]:
-        spikes = spikes[:, -signal.shape[1]:]  # Cut columns from the beginning of spikes if needed
-
-    # Initialize arrays
-    num_rows, num_cols = signal.shape
-    feed = np.zeros((num_rows, num_cols))
-    b_pure_fits = np.zeros(num_rows)
-
-    # Process each row separately
-    for row in range(num_rows):
-        # Smooth the signal and its derivative for the current row
-        smooth_cal = sig.savgol_filter(signal[row], window_length=sg_win, deriv=0, delta=1, polyorder=3)
-        smooth_deriv = sig.savgol_filter(signal[row], window_length=sg_win, deriv=1, delta=1, polyorder=3)
-        
-        # Identify spikes and the surrounding indices to remove
-        bool_check = np.all((spikes[row] == 0) | (spikes[row] == 1))
-        if bool_check:
-            event_spikes = np.where(spikes[row])[0]
-        else:
-            event_spikes = spikes[row].astype(int)
-
-        remove_index = []
-        for i in event_spikes:
-            remove_index.extend(np.arange(i - win_len, i + win_len))
-        
-        remove_index = np.array(remove_index)
-        remove_index = remove_index[(remove_index >= 0) & (remove_index < num_cols)]
-
-        # Remove indices from smooth_cal and smooth_deriv for fitting purposes
-        smooth_cal_nosp = np.delete(smooth_cal, remove_index)
-        smooth_deriv_nosp = np.delete(smooth_deriv, remove_index)
-
-        # Fit a line to the modified arrays and store b_pure_fit for the row
-        if smooth_cal_nosp.size > 1:  # Ensure there's enough data for fitting
-            b_pure_fit, _ = np.polyfit(smooth_cal_nosp, smooth_deriv_nosp, deg=1)
-            b_pure_fits[row] = 1/b_pure_fit
-        else:
-            b_pure_fits[row] = 0  # Default value if fitting is not possible
-
-        # Calculate feed for this row
-        feed[row, :] = -b_pure_fits[row] * smooth_cal + smooth_deriv
-
-    return feed, b_pure_fits
-
-
-def dask_feed_raper(signal, spikes, win_len=5, sg_delta=31):
-    feed, _ = dask_pre_process(signal, spikes, win_len, sg_delta)
-    return feed
-
-def dask_fits_raper(signal, spikes, win_len=5, sg_delta=31):
-    _, b_pure_fits = dask_pre_process(signal, spikes, win_len, sg_delta)
-    return b_pure_fits
-
-
 def dask_pre_process(signal, spikes, sg_win=31, win_len=5):
     # Ensure shapes match
     if signal.shape[1] != spikes.shape[1]:
@@ -126,5 +70,78 @@ def dask_pre_process(signal, spikes, sg_win=31, win_len=5):
         feed[row, :] = -b_pure_fits[row] * smooth_cal + smooth_deriv
 
     return feed, b_pure_fits
+
+
+def dask_feed_raper(signal, spikes, win_len=5, sg_delta=31):
+    feed, _ = dask_pre_process(signal, spikes, win_len, sg_delta)
+    return feed
+
+
+def dask_fits_raper(signal, spikes, win_len=5, sg_delta=31):
+    _, b_pure_fits = dask_pre_process(signal, spikes, win_len, sg_delta)
+    return b_pure_fits
+
+########################################
+
+def apply_sav_gol(signal_row, sg_win):
+    smooth_cal = sig.savgol_filter(signal_row, window_length=sg_win, deriv=0, delta=1, polyorder=3)
+    smooth_deriv = sig.savgol_filter(signal_row, window_length=sg_win, deriv=1, delta=1, polyorder=3)
+    return smooth_cal, smooth_deriv
+
+def calculate_mask(spikes_row, win_len, num_cols):
+    """Calculate the mask to exclude indices around spikes."""
+    mask = np.ones(num_cols, dtype=bool)
+    event_spikes = np.where(spikes_row)[0]
+    
+    for i in event_spikes:
+        start = max(0, i - win_len)
+        end = min(num_cols, i + win_len)
+        mask[start:end] = False
+    
+    return mask
+
+def perform_polyfit(smooth_cal, smooth_deriv, mask):
+    """Perform polynomial fitting on masked data."""
+    valid_indices = np.where(mask)[0]
+    if valid_indices.size > 1:  # Ensure sufficient data for fitting
+        b_pure_fit, _ = np.polyfit(smooth_cal[valid_indices], smooth_deriv[valid_indices], deg=1)
+        return 1 / b_pure_fit
+    else:
+        return 0  # Default if insufficient data
+
+def calculate_feed(smooth_cal, smooth_deriv, b_pure_fit):
+    return -b_pure_fit * smooth_cal + smooth_deriv
+
+def dask_preprocess(signal, spikes, sg_win=31, win_len=5):
+
+    if signal.shape[1] != spikes.shape[1]:
+        spikes = spikes[:, -signal.shape[1]:]
+
+    num_rows, num_cols = signal.shape
+    feed = np.zeros((num_rows, num_cols))
+    b_pure_fits = np.zeros(num_rows)
+
+    for row in range(num_rows):
+        smooth_cal, smooth_deriv = apply_sav_gol(signal[row], sg_win)
+        mask = calculate_mask(spikes[row], win_len, num_cols)
+        b_pure_fits[row] = perform_polyfit(smooth_cal, smooth_deriv, mask)
+        feed[row, :] = calculate_feed(smooth_cal, smooth_deriv, b_pure_fits[row])
+
+    return feed
+
+def dask_estimate_kernels(signal, spikes, sg_win=31, win_len=5):
+
+    if signal.shape[1] != spikes.shape[1]:
+        spikes = spikes[:, -signal.shape[1]:]
+
+    num_rows, num_cols = signal.shape
+    b_pure_fits = np.zeros(num_rows)
+
+    for row in range(num_rows):
+        smooth_cal, smooth_deriv = apply_sav_gol(signal[row], sg_win)
+        mask = calculate_mask(spikes[row], win_len, num_cols)
+        b_pure_fits[row] = perform_polyfit(smooth_cal, smooth_deriv, mask)
+
+    return b_pure_fits
 
 
