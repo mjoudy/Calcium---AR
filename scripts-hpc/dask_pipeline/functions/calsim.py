@@ -1,6 +1,4 @@
 import numpy as np
-import zarr
-
 
 
 def sim_calcium(spikes, tau=100):
