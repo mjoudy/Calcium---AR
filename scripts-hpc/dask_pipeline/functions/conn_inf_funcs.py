@@ -14,14 +14,13 @@ from sklearn.linear_model import Ridge
 #plt.style.use('seaborn')
 
 #sns.set_style('white')
-
+'''
 def time_const(cut_signal, cut_deriv):
     
     tau_est.append(ro.pure_fit(cut_signal, cut_deriv))
 
     return np.array(tau_est)
-
-
+'''
 def reconstructed_spikes(signal, deriv, tau_est):
     #shall be upgraded for using different methods of outlier removal
     #return np.array(deriv + (-tau_est)*signal)

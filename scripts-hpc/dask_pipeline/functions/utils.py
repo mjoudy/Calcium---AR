@@ -1,4 +1,6 @@
 import json
+import os
+import psutil
 
 #This function has been created to avoid confiosion of files durind mass experiments.
 #One can use it to name files in a way that is easy to understand and identify parameters space and stages of the job(spikes, calcium, preprocessed, ...).
@@ -45,5 +47,14 @@ def nameit(input_file, replacement, **kwargs):
 
     modified_name += '.zarr'
     return modified_name
+
+def monitor_cpu_usage():
+    """
+    Monitor the actual number of CPUs used during runtime.
+    """
+    process = psutil.Process(os.getpid())
+    cpu_usage = process.cpu_percent(interval=1)  # Measure over a 1-second interval
+    cpu_count = len(process.cpu_affinity())     # Get CPU affinity (available CPUs)
+    return cpu_usage, cpu_count
 
         
