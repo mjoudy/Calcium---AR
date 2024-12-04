@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import scipy.signal as sig
 import seaborn as sns
 from functions import remove_outliers as ro
+from functions import remove_outliers as ro
 
 def dask_calcium(spikes, tau=100):
 
