@@ -20,6 +20,7 @@ def main(signals, conn_matrix, lag):
     print(f"Initial CPU usage: {initial_cpu_usage}% of {available_cpus} CPUs available.")
 
     corr, A = cif.conn_inf_LR(conn_matrix, signals, lag)
+    np.save("est.npy", A)
 
     final_cpu_usage, available_cpus = ut.monitor_cpu_usage()
     print(f"Final CPU usage: {final_cpu_usage}% of {available_cpus} CPUs available.")

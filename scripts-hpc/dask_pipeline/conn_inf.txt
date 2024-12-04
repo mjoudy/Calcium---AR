@@ -2,19 +2,19 @@ Number of CPUs: 2
 Monitoring CPU usage...
 Initial CPU usage: 0.0% of 2 CPUs available.
 Final CPU usage: 0.0% of 2 CPUs available.
-Correlation: -0.05091471632091077
+Correlation: 0.14438809647393744
 
 ============================= JOB FEEDBACK =============================
 
-NodeName=uc2n522
-Job ID: 24971858
+NodeName=uc2n521
+Job ID: 24979950
 Cluster: uc2
 User/Group: fr_mj200/fr_fr
 State: COMPLETED (exit code 0)
 Nodes: 1
 Cores per node: 40
-CPU Utilized: 00:05:06
-CPU Efficiency: 2.26% of 03:46:00 core-walltime
-Job Wall-clock time: 00:05:39
-Memory Utilized: 56.07 GB
-Memory Efficiency: 32.98% of 170.00 GB
+CPU Utilized: 00:05:10
+CPU Efficiency: 1.95% of 04:25:20 core-walltime
+Job Wall-clock time: 00:06:38
+Memory Utilized: 63.04 GB
+Memory Efficiency: 37.08% of 170.00 GB
