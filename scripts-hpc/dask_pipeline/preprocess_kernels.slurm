@@ -18,7 +18,7 @@ conda activate phd_conda
 PROJECT_DIR=${PROJECT_DIR:-$(pwd)}
 
 # Input file (relative to project directory)
-INPUT_CALCIUM="$PROJECT_DIR/data/calcium-N1250-T10e06-tau50.0.zarr"
+INPUT_CALCIUM="$PROJECT_DIR/data/calcium-N1250-T10e06-tau100.0.zarr"
 INPUT_SPIKES="$PROJECT_DIR/data/spikes-N1250-T10e06.zarr"
 
 # Array of sg_delta values

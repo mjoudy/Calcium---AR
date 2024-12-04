@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.signal as sig
 import seaborn as sns
+from functions import remove_outliers as ro
 
 def dask_calcium(spikes, tau=100):
 
@@ -54,16 +55,17 @@ def calculate_mask(spikes_row, win_len, num_cols):
 
 def perform_polyfit(smooth_cal, smooth_deriv, mask):
     """Perform polynomial fitting on masked data."""
+    #b is slope of the fitted line of signal-derivative. -1/b=tau.
     valid_indices = np.where(mask)[0]
     if valid_indices.size > 1:  # Ensure sufficient data for fitting
-        b_pure_fit, _ = np.polyfit(smooth_cal[valid_indices], smooth_deriv[valid_indices], deg=1)
-        #return 1 / b_pure_fit
+        #b_pure_fit, _ = np.polyfit(smooth_cal[valid_indices], smooth_deriv[valid_indices], deg=1)
+        b_pure_fit = ro.pure_fit(smooth_cal[valid_indices], smooth_deriv[valid_indices])
         return b_pure_fit
     else:
         return 0  # Default if insufficient data
 
 def calculate_feed(smooth_cal, smooth_deriv, b_pure_fit):
-    return -b_pure_fit * smooth_cal + smooth_deriv
+    return (-b_pure_fit)*smooth_cal + smooth_deriv
 
 def dask_preprocess(signal, spikes, sg_win=31, win_len=5):
 

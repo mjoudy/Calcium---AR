@@ -1,20 +1,20 @@
 /home/fr/fr_fr/fr_mj200/.conda/envs/phd_conda/lib/python3.12/site-packages/zarr/creation.py:614: UserWarning: ignoring keyword argument 'read_only'
   compressor, fill_value = _kwargs_compat(compressor, fill_value, kwargs)
-Calcium signal address: /pfs/work7/workspace/scratch/fr_mj200-phd_project/Calcium---AR/scripts-hpc/dask_pipeline/data/calcium-N1250-T10e06-tau50.0.zarr
-SLURMCluster(ea1b3cfa, 'tcp://10.0.2.10:33153', workers=0, threads=0, memory=0 B)
-<Client: 'tcp://10.0.2.10:33153' processes=0 threads=0, memory=0 B>
+Calcium signal address: /pfs/work7/workspace/scratch/fr_mj200-phd_project/Calcium---AR/scripts-hpc/dask_pipeline/data/calcium-N1250-T10e06-tau100.0.zarr
+SLURMCluster(32476c06, 'tcp://10.0.2.10:34539', workers=0, threads=0, memory=0 B)
+<Client: 'tcp://10.0.2.10:34539' processes=0 threads=0, memory=0 B>
 
 ============================= JOB FEEDBACK =============================
 
 NodeName=uc2n522
-Job ID: 24890756
+Job ID: 24971896
 Cluster: uc2
 User/Group: fr_mj200/fr_fr
 State: COMPLETED (exit code 0)
 Nodes: 1
 Cores per node: 2
-CPU Utilized: 00:00:06
-CPU Efficiency: 2.80% of 00:03:34 core-walltime
-Job Wall-clock time: 00:01:47
-Memory Utilized: 216.36 MB
-Memory Efficiency: 0.13% of 160.00 GB
+CPU Utilized: 00:00:07
+CPU Efficiency: 3.33% of 00:03:30 core-walltime
+Job Wall-clock time: 00:01:45
+Memory Utilized: 223.32 MB
+Memory Efficiency: 0.14% of 160.00 GB

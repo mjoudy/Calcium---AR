@@ -1,21 +1,21 @@
 /home/fr/fr_fr/fr_mj200/.conda/envs/phd_conda/lib/python3.12/site-packages/zarr/creation.py:614: UserWarning: ignoring keyword argument 'read_only'
   compressor, fill_value = _kwargs_compat(compressor, fill_value, kwargs)
-Calcium signal address: /pfs/work7/workspace/scratch/fr_mj200-phd_project/Calcium---AR/scripts-hpc/dask_pipeline/data/calcium-N1250-T10e06-tau50.0.zarr
-SLURMCluster(32fb35ba, 'tcp://10.0.2.9:37047', workers=0, threads=0, memory=0 B)
-<Client: 'tcp://10.0.2.9:37047' processes=0 threads=0, memory=0 B>
-Processed feed data saved to /pfs/work7/workspace/scratch/fr_mj200-phd_project/Calcium---AR/scripts-hpc/dask_pipeline/data/pre_processed-N1250-T10e06-tau50.0-sg_win31.zarr
+Calcium signal address: /pfs/work7/workspace/scratch/fr_mj200-phd_project/Calcium---AR/scripts-hpc/dask_pipeline/data/calcium-N1250-T10e06-tau100.0.zarr
+SLURMCluster(1963cb91, 'tcp://10.0.2.9:39163', workers=0, threads=0, memory=0 B)
+<Client: 'tcp://10.0.2.9:39163' processes=0 threads=0, memory=0 B>
+Processed feed data saved to /pfs/work7/workspace/scratch/fr_mj200-phd_project/Calcium---AR/scripts-hpc/dask_pipeline/data/pre_processed-N1250-T10e06-tau100.0-sg_win31.zarr
 
 ============================= JOB FEEDBACK =============================
 
 NodeName=uc2n521
-Job ID: 24891709
+Job ID: 24979748
 Cluster: uc2
 User/Group: fr_mj200/fr_fr
 State: COMPLETED (exit code 0)
 Nodes: 1
 Cores per node: 2
-CPU Utilized: 00:00:07
-CPU Efficiency: 2.01% of 00:05:48 core-walltime
-Job Wall-clock time: 00:02:54
-Memory Utilized: 220.26 MB
+CPU Utilized: 00:00:08
+CPU Efficiency: 2.11% of 00:06:20 core-walltime
+Job Wall-clock time: 00:03:10
+Memory Utilized: 220.35 MB
 Memory Efficiency: 0.13% of 160.00 GB

@@ -17,7 +17,7 @@ conda activate phd_conda
 # Define the project directory (use environment variable or default to current directory)
 PROJECT_DIR=${PROJECT_DIR:-$(pwd)}
 
-INPUT_SIGNALS="$PROJECT_DIR/data/pre_processed-N1250-T10e06-tau50.0-sg_win31.zarr"
+INPUT_SIGNALS="$PROJECT_DIR/data/pre_processed-N1250-T10e06-tau100.0-sg_win31.zarr"
 INPUT_CONN_MAT="$PROJECT_DIR/data/connectivity-N1250-T10e06.npy"
 
 INPUT_LAG=10
