@@ -14,25 +14,25 @@ from sklearn.linear_model import Ridge
 #plt.style.use('seaborn')
 
 #sns.set_style('white')
-'''
+
 def time_const(cut_signal, cut_deriv):
     
     tau_est.append(ro.pure_fit(cut_signal, cut_deriv))
 
     return np.array(tau_est)
-'''
+
 def reconstructed_spikes(signal, deriv, tau_est):
     #shall be upgraded for using different methods of outlier removal
     #return np.array(deriv + (-tau_est)*signal)
     return (deriv + (-tau_est)*signal)
 
-'''
+
 def reconstructed_spikes(signal, deriv, cut_signal, cut_deriv):
     #shall be upgraded for using different methods of outlier removal
     tau_est = ro.pure_fit(cut_signal, cut_deriv)
     
     return deriv + (-tau_est)*signal
-'''
+
 
 
 def conn_inf_LR(conn_matrix, signals, lag=10):

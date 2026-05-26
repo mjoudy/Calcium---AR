@@ -52,7 +52,7 @@ def dask_smooth(signal, win_len=5):
     return smooth_cal, smooth_deriv
 
 
-def sim_calcium(spikes, tau=100, neuron_id=500):
+def sim_calcium(spikes, tau=100, neuron_id=50):
 
     if neuron_id == -1:
         N = np.shape(spikes)[0]
@@ -116,7 +116,7 @@ def smoothed_signals(signal, win_len, do_plots=False):
     smooth_deriv = sig.savgol_filter(signal, window_length=win_len, deriv=1, delta=1., polyorder=3)
 
     if (do_plots==True) & (signal.ndim!=1):
-        neuron_id = 500
+        neuron_id = 50
         fig, ax1 = plt.subplots(figsize=(20,8))
         ax1.plot(smooth_cal[neuron_id, :])
         ax1.plot(30*smooth_deriv[neuron_id, :])

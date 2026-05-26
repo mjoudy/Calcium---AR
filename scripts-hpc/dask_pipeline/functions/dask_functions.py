@@ -59,7 +59,6 @@ def perform_polyfit(smooth_cal, smooth_deriv, mask):
     #b is slope of the fitted line of signal-derivative. -1/b=tau.
     valid_indices = np.where(mask)[0]
     if valid_indices.size > 1:  # Ensure sufficient data for fitting
-        #b_pure_fit, _ = np.polyfit(smooth_cal[valid_indices], smooth_deriv[valid_indices], deg=1)
         b_pure_fit = ro.pure_fit(smooth_cal[valid_indices], smooth_deriv[valid_indices])
         return b_pure_fit
     else:

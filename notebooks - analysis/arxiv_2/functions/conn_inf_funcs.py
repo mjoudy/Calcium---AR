@@ -8,10 +8,11 @@ from sklearn.linear_model import LinearRegression
 from sklearn.linear_model import Lasso
 from sklearn.linear_model import Ridge
 
-import remove_outliers as ro
+import functions.remove_outliers as ro
 
 #plt.style.use('ggplot')
-plt.style.use('seaborn')
+#plt.style.use('seaborn')
+sns.set()
 
 #sns.set_style('white')
 
