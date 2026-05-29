@@ -1,0 +1,19 @@
+==============================================================
+  Brunel network sanity check
+  NE=1000  NI=250  N=1250
+  epsilon=0.1  C_E=100  C_I=25
+  J_ex=8.0000 mV  (manual override)
+  J_ex × C_E = 800.00  (ref = 80.0)
+  g=6.0  eta=2.0
+  ν_th = 1.2 Hz  →  η×ν_th = 2.5 Hz
+  sim_time=10000.0 ms   tau_ca=400.0 ms
+  output → scripts/sanity_n1250_correct
+==============================================================
+=== SANITY SUMMARY  N=1250 (NE=1000, NI=250) ===
+  Total spikes        : 708913
+  Active neurons      : 1250/1250  (100%)
+  Mean firing rate    : 56.7 ± 15.2 Hz
+  Median firing rate  : 56.1 Hz
+  Mean pop. rate      : 56.7 Hz
+  Mean CV(ISI)        : 3.863  (target ≈ 1.0 for AI state)
+  Median CV(ISI)      : 3.819

@@ -5,11 +5,39 @@ envs/
 .conda_envs/
 .conda_pkgs/
 
+# Large binary / data files
 *.dat
 *.npy
 *.h5
 *.hdf5
 *.zarr
+*.pkl
+*.pickle
+*.npz
+
+# Experiment results (large outputs)
+results/
+scripts/sanity_n100_output/
+scripts/sanity_n1250_output/
+
+# SSH keys and credentials
+key-pair
+key-pair.pub
+*.pem
+id_rsa
+id_ed25519
+
+# Python bytecode
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Scratch / temp files
+*.ods
+*.ods~
+*.swp
+*~
 
 scripts-hpc/dask_pipeline/logs/
 scripts-hpc/dask_pipeline/data/
