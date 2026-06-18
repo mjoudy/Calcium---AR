@@ -52,6 +52,7 @@ def stream_feed_to_zarr(
     tau_est: np.ndarray | float,
     window_length: int = 31,
     chunk_size: int = 10_000,
+    dt: float = 1.0,
 ) -> str:
     """
     Chunked streaming feed reconstruction — O(N × chunk_size) RAM.
@@ -110,11 +111,11 @@ def stream_feed_to_zarr(
 
         smooth = sig.savgol_filter(
             block, window_length=window_length, polyorder=3,
-            deriv=0, delta=1.0, axis=-1,
+            deriv=0, delta=dt, axis=-1,
         )
         deriv = sig.savgol_filter(
             block, window_length=window_length, polyorder=3,
-            deriv=1, delta=1.0, axis=-1,
+            deriv=1, delta=dt, axis=-1,
         )
 
         # Slice the core (non-overlapping) region

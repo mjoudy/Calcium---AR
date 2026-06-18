@@ -55,14 +55,15 @@ def solve(zarr_path: str, lag: int = 10, lam: float = 1.0,
     s_now    = np.zeros(N)
     n        = 0
 
-    n_chunks = (T - lag) // chunk_size
+    n_full   = (T - lag) // chunk_size
+    n_chunks = n_full + (1 if (T - lag) % chunk_size else 0)
 
     # ------------------------------------------------------------------ #
     # Single pass: accumulate raw cross-products and column sums          #
     # ------------------------------------------------------------------ #
     for k in range(n_chunks):
         t0 = k * chunk_size
-        t1 = t0 + chunk_size
+        t1 = min(t0 + chunk_size, T - lag)
 
         x_prev = np.asarray(signals[:, t0       : t1      ])
         x_now  = np.asarray(signals[:, t0 + lag : t1 + lag])

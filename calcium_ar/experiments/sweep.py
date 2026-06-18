@@ -17,7 +17,7 @@ Usage
 
     base = ExperimentConfig(solver='ridge', sim_time=5000.0)
     sweep = ParameterSweep(
-        params={'lag': [1, 5, 10, 20], 'lam': [0.1, 1.0, 10.0]},
+        params={'lag_ms': [1.0, 5.0, 10.0, 20.0], 'lam': [0.1, 1.0, 10.0]},
         base_config=base,
         sweep_dir='results/sweeps/lag_vs_lam',
     )

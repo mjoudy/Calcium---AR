@@ -87,10 +87,12 @@ def remove_outliers_iqr(signal, deriv, threshold=1.5, p_lo=25, p_hi=75, do_plot=
 # RANSAC
 # ---------------------------------------------------------------------------
 
-def remove_outliers_ransac(signal, deriv, residual_threshold=0.05, do_plot=False):
+def remove_outliers_ransac(signal, deriv, residual_threshold=0.05,
+                           random_state=0, do_plot=False):
     """RANSAC robust regression — ignores spike-trajectory outliers."""
-    def _core(x, y, residual_threshold=0.05, do_plot=False):
-        ransac = RANSACRegressor(residual_threshold=residual_threshold)
+    def _core(x, y, residual_threshold=0.05, random_state=0, do_plot=False):
+        ransac = RANSACRegressor(residual_threshold=residual_threshold,
+                                 random_state=random_state)
         try:
             ransac.fit(x.reshape(-1, 1), y)
         except Exception:
@@ -108,7 +110,8 @@ def remove_outliers_ransac(signal, deriv, residual_threshold=0.05, do_plot=False
             ax.set_ylabel("Derivative")
             ax.legend()
         return slope
-    return _dispatch(signal, deriv, _core, residual_threshold=residual_threshold, do_plot=do_plot)
+    return _dispatch(signal, deriv, _core, residual_threshold=residual_threshold,
+                     random_state=random_state, do_plot=do_plot)
 
 
 # ---------------------------------------------------------------------------

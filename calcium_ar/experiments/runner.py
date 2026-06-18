@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Callable
 
 import numpy as np
@@ -38,12 +39,14 @@ from .metrics import compute_all as compute_metrics
 
 _SOLVER_MAP = {
     "ols":                "solve_ols",
+    "sklearn_ols":        "solve_sklearn_ols",
     "ridge":              "solve_ridge",
     "torch_normal_eq":    "solve_torch_normal_eq",
     "torch_minibatch":    "solve_torch_minibatch",
     "torch_linear_layer": "solve_torch_linear_layer",
     "torch_gd":           "solve_torch_gd",
     "sklearn_lasso":      "solve_sklearn_lasso",
+    "fista":              "solve_fista",
 }
 
 
@@ -94,12 +97,13 @@ def _get_data(config: ExperimentConfig) -> tuple[np.ndarray, np.ndarray, np.ndar
 def _call_solver(
     config: ExperimentConfig,
     zarr_path: str,
+    lag_samples: int,
     on_epoch: Callable[[int, float], None] | None,
 ) -> np.ndarray:
     fn = getattr(_slv, _SOLVER_MAP[config.solver])
-    common = dict(zarr_path=zarr_path, lag=config.lag)
+    common = dict(zarr_path=zarr_path, lag=lag_samples)
 
-    if config.solver == "ols":
+    if config.solver in ("ols", "sklearn_ols"):
         return fn(**common, chunk_size=config.chunk_size)
 
     if config.solver == "ridge":
@@ -116,6 +120,10 @@ def _call_solver(
 
     if config.solver == "sklearn_lasso":
         return fn(**common, lam=config.lam, chunk_size=config.chunk_size)
+
+    if config.solver == "fista":
+        return fn(**common, lam_l1=config.lam, lam_l2=config.lam_l2,
+                  chunk_size=config.chunk_size, n_iter=config.n_epochs * 50)
 
     return fn(
         **common,
@@ -154,6 +162,14 @@ def run_single(config: ExperimentConfig) -> ExperimentResult:
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
 
     # ------------------------------------------------------------------ #
+    # Derived sample-domain quantities from physical-unit config fields
+    # ------------------------------------------------------------------ #
+    lag_samples = max(1, round(config.lag_ms / config.dt))
+
+    _w = max(5, round(config.smooth_window_ms / config.dt))
+    smooth_win = _w if _w % 2 == 1 else _w + 1   # savgol requires odd window
+
+    # ------------------------------------------------------------------ #
     # 1. Run directory
     # ------------------------------------------------------------------ #
     run_dir = make_run_dir(config)
@@ -176,6 +192,7 @@ def run_single(config: ExperimentConfig) -> ExperimentResult:
         # -------------------------------------------------------------- #
         ds = SimulatedDataset.load_or_generate(config, config.data_path)
         adj_true     = ds.adj_true
+        np.fill_diagonal(adj_true, 0.0)
         calcium_zarr = ds.calcium           # zarr.Array — never fully loaded
         spikes       = None
         fluorescence = None
@@ -186,30 +203,34 @@ def run_single(config: ExperimentConfig) -> ExperimentResult:
         cal_sub = np.asarray(calcium_zarr[:, :sub_T])
         tau_est = estimate_tau_robust(
             cal_sub,
-            window_length=config.smooth_window,
+            window_length=smooth_win,
             method=config.tau_method,
+            dt=config.dt,
         )
 
         # Chunked feed reconstruction writes directly to zarr on disk
         feed_zarr_path = str(run_dir / "feed.zarr")
         stream_feed_to_zarr(
             calcium_zarr, feed_zarr_path, tau_est,
-            window_length=config.smooth_window,
+            window_length=smooth_win,
             chunk_size=config.chunk_size,
+            dt=config.dt,
         )
     else:
         # -------------------------------------------------------------- #
         # In-memory path
         # -------------------------------------------------------------- #
         spikes, fluorescence, adj_true = _get_data(config)
+        np.fill_diagonal(adj_true, 0.0)
 
         smooth, deriv = get_signal_derivative_pair(
-            fluorescence, window_length=config.smooth_window
+            fluorescence, window_length=smooth_win, delta=config.dt
         )
         tau_est = estimate_tau_robust(
             fluorescence,
-            window_length=config.smooth_window,
+            window_length=smooth_win,
             method=config.tau_method,
+            dt=config.dt,
         )
         feed = reconstruct_feed(smooth, deriv, tau_est)
         feed_zarr_path = save_feed_zarr(feed, run_dir)
@@ -219,9 +240,10 @@ def run_single(config: ExperimentConfig) -> ExperimentResult:
     # ------------------------------------------------------------------ #
     loss_curve: list[float] = []
     adj_inferred = _call_solver(
-        config, feed_zarr_path,
+        config, feed_zarr_path, lag_samples,
         on_epoch=lambda epoch, loss: loss_curve.append(loss),
     )
+    np.fill_diagonal(adj_inferred, 0.0)
 
     # ------------------------------------------------------------------ #
     # 6. Evaluate — delegate entirely to metrics registry
@@ -259,6 +281,14 @@ def run_single(config: ExperimentConfig) -> ExperimentResult:
     # 8. Persist
     # ------------------------------------------------------------------ #
     save_result(result, config, spikes, fluorescence, adj_true, adj_inferred)
+
+    # Append one row to the experiment ledger (Layer 1 of the record).
+    # Non-fatal: a logging error must never lose a completed experiment.
+    try:
+        from .ledger import append_row
+        append_row(result, config, Path(config.output_dir) / "ledger.csv")
+    except Exception as e:                       # noqa: BLE001
+        print(f"[ledger] warning: could not append run to ledger ({e})")
 
     corr = all_metrics.get("connectivity/pearson", float("nan"))
     auc  = all_metrics.get("connectivity/auc_roc", float("nan"))

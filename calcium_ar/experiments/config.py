@@ -42,17 +42,23 @@ class ExperimentConfig:
     # ------------------------------------------------------------------ #
     # Preprocessing
     # ------------------------------------------------------------------ #
-    smooth_window: int  = 31        # Savitzky-Golay window length (3.1 ms at dt=0.1)
+    smooth_window_ms: float = 3.1   # Savitzky-Golay window duration (ms); converted
+                                    # to samples as round(smooth_window_ms / dt),
+                                    # enforced odd and >= 5
     tau_method: str     = "ransac"  # ols | ransac | dbscan | iqr | zscore
     spike_cut_window: int = 5       # half-window around spikes to remove
 
     # ------------------------------------------------------------------ #
     # Solver
     # ------------------------------------------------------------------ #
-    solver: str         = "ridge"   # ols | ridge | torch_normal_eq |
-                                    # torch_minibatch | torch_linear_layer
-    lag: int            = 10        # AR lag (time steps)
-    lam: float          = 1.0       # regularisation strength
+    solver: str         = "ridge"   # ols | ridge | fista |
+                                    # torch_normal_eq | torch_minibatch |
+                                    # torch_linear_layer | sklearn_lasso
+    lag_ms: float       = 10.0      # AR lag in physical time (ms); converted to
+                                    # samples as round(lag_ms / dt) by runner
+    lam: float          = 1.0       # regularisation strength (L1 for fista/lasso,
+                                    # L2 for ridge)
+    lam_l2: float       = 1e-3      # L2 strength for fista (Elastic Net only)
     chunk_size: int     = 10_000    # time steps per chunk / mini-batch
     n_epochs: int       = 10        # gradient-descent epochs (torch only)
     lr: float           = 1e-3      # Adam learning rate (torch only)

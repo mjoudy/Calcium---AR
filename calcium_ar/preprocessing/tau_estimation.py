@@ -61,6 +61,7 @@ def estimate_tau_robust(
     signal: np.ndarray,
     window_length: int = 5,
     method: str = "ransac",
+    dt: float = 1.0,
     do_plot: bool = False,
 ) -> float | np.ndarray:
     """
@@ -72,17 +73,20 @@ def estimate_tau_robust(
     Parameters
     ----------
     signal : (T,) or (N, T) calcium fluorescence.
-    window_length : Savitzky-Golay window for derivative estimation.
+    window_length : Savitzky-Golay window for derivative estimation (samples).
     method : one of 'ols', 'ransac' (default), 'dbscan', 'iqr', 'zscore'.
+    dt : time step in ms. Passed as delta to savgol so the derivative is in
+         signal/ms and the returned tau is in ms.
     do_plot : show phase-space plot for the first neuron.
 
     Returns
     -------
-    tau : float (1-D input) or np.ndarray shape (N,).
+    tau : float (1-D input) or np.ndarray shape (N,) — in the same units as dt.
     """
     if method not in _METHODS:
         raise ValueError(f"method must be one of {list(_METHODS)}; got '{method}'")
 
-    smooth, deriv = get_signal_derivative_pair(signal, window_length=window_length)
+    smooth, deriv = get_signal_derivative_pair(signal, window_length=window_length,
+                                               delta=dt)
     slopes = _METHODS[method](smooth, deriv, do_plot=do_plot)
     return _slope_to_tau(slopes)

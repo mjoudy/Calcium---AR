@@ -71,17 +71,19 @@ def solve(zarr_path: str, lag: int = 10, chunk_size: int = 10_000) -> np.ndarray
     s_now    = np.zeros(N)        # column sum of x_t
     n        = 0                  # total number of paired samples
 
-    n_chunks = (T - lag) // chunk_size
+    n_full   = (T - lag) // chunk_size
+    # include trailing partial chunk so all T-lag samples are used
+    n_chunks = n_full + (1 if (T - lag) % chunk_size else 0)
 
     # ------------------------------------------------------------------ #
     # Single pass: accumulate raw cross-products and column sums          #
     # ------------------------------------------------------------------ #
     for k in range(n_chunks):
         t0 = k * chunk_size
-        t1 = t0 + chunk_size
+        t1 = min(t0 + chunk_size, T - lag)   # clamp at T-lag for last chunk
 
-        x_prev = np.asarray(signals[:, t0       : t1      ])  # (N, chunk_size)
-        x_now  = np.asarray(signals[:, t0 + lag : t1 + lag])  # (N, chunk_size)
+        x_prev = np.asarray(signals[:, t0       : t1      ])  # (N, chunk)
+        x_now  = np.asarray(signals[:, t0 + lag : t1 + lag])  # (N, chunk)
 
         C_xx_raw += x_prev @ x_prev.T   # (N, N)
         C_yx_raw += x_now  @ x_prev.T   # (N, N)

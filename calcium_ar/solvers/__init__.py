@@ -2,6 +2,11 @@ from .chunked_ols import solve as solve_ols
 from .chunked_ridge import solve as solve_ridge
 
 
+def solve_sklearn_ols(*args, **kwargs):
+    from .sklearn_ols import solve
+    return solve(*args, **kwargs)
+
+
 def solve_torch_normal_eq(*args, **kwargs):
     from .torch_normal_eq import solve
     return solve(*args, **kwargs)
@@ -24,4 +29,9 @@ def solve_torch_gd(*args, **kwargs):
 
 def solve_sklearn_lasso(*args, **kwargs):
     from .sklearn_lasso import solve
+    return solve(*args, **kwargs)
+
+
+def solve_fista(*args, **kwargs):
+    from .fista import solve
     return solve(*args, **kwargs)
