@@ -1,0 +1,503 @@
+\documentclass[11pt,a4paper]{article}
+
+% --- packages (all standard in texlive) ---
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=2.4cm]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{parskip}
+\usepackage[hidelinks]{hyperref}
+
+% --- light styling ---
+\definecolor{accent}{RGB}{40,70,140}
+\hypersetup{colorlinks=true,linkcolor=accent,urlcolor=accent}
+
+\newcommand{\xx}{\mathbf{x}}
+\newcommand{\uu}{\mathbf{u}}
+\newcommand{\Amat}{\mathbf{A}}
+\newcommand{\eps}{\boldsymbol{\varepsilon}}
+\newcommand{\Xp}{\mathbf{X}_{\text{past}}}
+\newcommand{\Xn}{\mathbf{X}_{\text{next}}}
+
+\title{\textbf{Estimating Synaptic Connectivity from Neural Activity}\\[4pt]
+\large A Linear-Regression Approach --- An Educational Chapter}
+\author{Mohammad Joudy \\ \small Bernstein Center Freiburg}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent
+This chapter explains, from first principles, how the question
+\emph{``which neurons are connected to which?''} can be turned into a
+\emph{linear regression}. We start from one simple physical idea --- a neuron's
+activity is shaped by the recent activity of the other neurons --- and build the
+regression up one step at a time, from a single neuron to the whole network. We
+then show where this idea comes from (the underlying linear dynamics of neural
+networks), how the regression is actually solved, and how three things change
+the picture: the \emph{external input}, the meaning of the \emph{residual}, and
+the use of \emph{regularization}. No specialist background is assumed.
+\end{abstract}
+
+\tableofcontents
+\vspace{1em}
+\hrule
+\vspace{1em}
+
+% ======================================================================
+\section{The question and the data}
+
+We record the activity of $N$ neurons over time and want to recover their
+\textbf{connectivity}: who connects to whom, whether each connection is
+\emph{excitatory} (one neuron makes another more active) or \emph{inhibitory}
+(less active), and how strong it is.
+
+\paragraph{The data.}
+The activity is measured with two-photon calcium imaging. Calcium fluorescence
+is a slow, blurred echo of a neuron's spikes. A fixed \textbf{preprocessing}
+step (deconvolution) turns each fluorescence trace back into a per-neuron
+\emph{activity feed}. From here on,
+\[
+x_i(t) \;=\; \text{activity (the preprocessed feed) of neuron } i \text{ at time } t .
+\]
+Preprocessing is part of the method and is not revisited in this chapter --- the
+feed $x_i(t)$ is simply our starting signal.
+
+\paragraph{How we test it.}
+To know whether an estimate is right, we use \emph{simulated} networks (of the
+Brunel type) where the true connectivity is known in advance. We run the method
+on the simulated activity and compare the estimate to the ground truth.
+
+% ======================================================================
+\section{Where the regression comes from: the underlying theory}
+\label{sec:theory}
+
+Before turning the problem into a regression, it helps to see the physical model
+the regression is built on.
+
+\paragraph{The idea.}
+A neuron's activity in the next instant is driven by the activity of the neurons
+that connect to it. Written as a continuous-time law for the whole network:
+\begin{equation}
+\frac{d\xx}{dt} \;=\; G\,\xx(t) \;+\; \uu(t),
+\label{eq:ode}
+\end{equation}
+where $\xx(t)$ is the vector of all $N$ activities, $\uu(t)$ is the external
+input, and $G$ is the $N\times N$ \emph{coupling matrix}. The off-diagonal entry
+$G_{ij}$ says how strongly neuron $j$ drives neuron $i$.\footnote{In the original
+literature the state is often called $y$ and the input $x$; here we call the
+activity $x$ and the input $u$, so that $x_i$ always means ``neuron $i$''.}
+
+\paragraph{Why a \emph{linear} law is reasonable.}
+Real neurons are nonlinear (they fire all-or-none spikes). Equation
+\eqref{eq:ode} is a \emph{first-order approximation} that is accurate when the
+network sits in a stable, irregular operating state --- the
+\emph{asynchronous-irregular} regime typical of cortex. Near such an operating
+point, small fluctuations of activity really do add up approximately linearly.
+This is the same ``linear response'' reasoning used throughout physics, and it
+is the bridge from the work of Rotter \& Diesmann (1999) to our setting. The
+coupling then factorizes as
+\begin{equation}
+G_{ij} \;=\; \frac{\text{gain}_i \cdot W_{ij}}{\tau}\qquad (i\neq j),
+\label{eq:gain}
+\end{equation}
+where $W_{ij}$ is the true \emph{synaptic} weight, $\text{gain}_i$ is how
+strongly neuron $i$ converts input into output, and $\tau$ is a time constant.
+The important message of \eqref{eq:gain} is: \textbf{$G$ is not the synaptic
+matrix $W$ itself, but a gain-scaled version of it.}
+
+\paragraph{From the law to one time step.}
+Solving \eqref{eq:ode} over one small step $\Delta$ gives an exact update rule:
+\begin{equation}
+\xx(t) \;=\; \underbrace{\exp(G\,\Delta)}_{\textstyle \Amat}\;\xx(t-\Delta)
+\;+\; \eps(t),
+\label{eq:onestep}
+\end{equation}
+with $\eps(t)$ collecting the input and noise over that step. The single matrix
+\[
+\boxed{\;\Amat \;=\; \exp(G\,\Delta)\;}
+\]
+is called the \emph{one-step propagator}. \textbf{This matrix $\Amat$ is exactly
+what the regression will estimate.}
+
+\paragraph{Why $\Amat$ carries the connectivity.}
+For a small step, $\exp(G\Delta)\approx I + G\Delta$, so for $i\neq j$
+\[
+A_{ij}\;\approx\;\Delta\,G_{ij}\;\propto\;\text{gain}_i\cdot W_{ij}.
+\]
+Hence the \emph{sign} of $A_{ij}$ tells excitatory from inhibitory, and its
+\emph{size} grows with the synaptic weight. Reading connectivity off $\Amat$ is
+therefore meaningful --- with the caveat that what we read is
+\emph{effective} connectivity (gain-scaled), not the raw synaptic weight.
+
+% ======================================================================
+\section{From the model to a regression, step by step}
+\label{sec:steps}
+
+We now rebuild Eq.~\eqref{eq:onestep} from the ground up, the way one would
+teach it. We use the simplest version: each neuron at time $t$ depends on all
+neurons at time $t-1$ (a one-step lag).
+
+\subsection{Step 1 --- one neuron}
+Take neuron $1$. Its activity at time $t$ is a weighted sum of \emph{every}
+neuron's activity at $t-1$:
+\begin{equation}
+x_1(t) = a_{11}x_1(t{-}1) + a_{12}x_2(t{-}1) + a_{13}x_3(t{-}1)
+         + \cdots + a_{1N}x_N(t{-}1) + \varepsilon_1(t).
+\end{equation}
+Here $a_{12}$ is how strongly neuron $2$ drives neuron $1$, $a_{13}$ how strongly
+neuron $3$ drives it, and so on. The last term $\varepsilon_1(t)$ is the
+\emph{leftover} (residual): everything not explained by the network --- external
+input plus noise. Each $a_{1j}$ is an unknown number we want to find.
+
+\subsection{Step 2 --- every neuron}
+Write the same line for neurons $1,2,3,\dots,N$:
+\begin{align}
+x_1(t) &= a_{11}x_1(t{-}1) + a_{12}x_2(t{-}1) + \cdots + a_{1N}x_N(t{-}1) + \varepsilon_1(t),\notag\\
+x_2(t) &= a_{21}x_1(t{-}1) + a_{22}x_2(t{-}1) + \cdots + a_{2N}x_N(t{-}1) + \varepsilon_2(t),\notag\\
+x_3(t) &= a_{31}x_1(t{-}1) + a_{32}x_2(t{-}1) + \cdots + a_{3N}x_N(t{-}1) + \varepsilon_3(t),\notag\\
+       &\;\;\vdots\notag\\
+x_N(t) &= a_{N1}x_1(t{-}1) + a_{N2}x_2(t{-}1) + \cdots + a_{NN}x_N(t{-}1) + \varepsilon_N(t).
+\label{eq:allneurons}
+\end{align}
+That is $N$ equations, one per neuron. All the unknown weights $a_{ij}$ form a
+table --- the matrix $\Amat$:
+\begin{equation}
+\Amat=\begin{bmatrix}
+a_{11} & a_{12} & a_{13} & \cdots & a_{1N}\\
+a_{21} & a_{22} & a_{23} & \cdots & a_{2N}\\
+a_{31} & a_{32} & a_{33} & \cdots & a_{3N}\\
+\vdots & & & \ddots & \vdots\\
+a_{N1} & a_{N2} & a_{N3} & \cdots & a_{NN}
+\end{bmatrix}.
+\end{equation}
+\textbf{Row $i$, column $j$ is $a_{ij}$ = the connection \emph{from} neuron $j$
+\emph{to} neuron $i$.} This table is the connectivity we are after.
+
+\subsection{Step 3 --- stack the neurons into a snapshot}
+Collect the $N$ activities at one time into a single column (a ``snapshot''):
+\[
+\xx(t)=\begin{bmatrix}x_1(t)\\ x_2(t)\\ x_3(t)\\ \vdots\\ x_N(t)\end{bmatrix}.
+\]
+Then the whole block \eqref{eq:allneurons} shrinks to one line:
+\begin{equation}
+\xx(t) \;=\; \Amat\,\xx(t{-}1) \;+\; \eps(t).
+\label{eq:vector}
+\end{equation}
+In words: \emph{this snapshot $=$ table $\Amat$ applied to the previous snapshot,
+plus leftovers}. This is exactly Eq.~\eqref{eq:onestep} from the theory.
+
+\subsection{Step 4 --- use many time steps}
+A single pair of snapshots cannot pin down $N\times N$ unknowns. But a recording
+gives thousands of consecutive pairs, and every pair obeys the \emph{same}
+table~$\Amat$:
+\[
+\begin{aligned}
+\xx(2) &= \Amat\,\xx(1) + \eps(2),\\
+\xx(3) &= \Amat\,\xx(2) + \eps(3),\\
+\xx(4) &= \Amat\,\xx(3) + \eps(4),\\
+&\;\;\vdots\\
+\xx(T) &= \Amat\,\xx(T{-}1) + \eps(T).
+\end{aligned}
+\]
+Line up the ``previous'' snapshots as columns of one matrix and the ``current''
+ones as columns of another:
+\[
+\Xp=\big[\,\xx(1)\;\xx(2)\;\cdots\;\xx(T{-}1)\,\big],\qquad
+\Xn=\big[\,\xx(2)\;\xx(3)\;\cdots\;\xx(T)\,\big].
+\]
+All time steps at once become a single matrix equation:
+\begin{equation}
+\boxed{\;\Xn \;=\; \Amat\,\Xp \;+\; \mathbf{E}\;}
+\label{eq:matrixform}
+\end{equation}
+This is a \textbf{multivariate linear regression}: predict $\Xn$ from $\Xp$ with
+the unknown weight table $\Amat$.
+
+% ======================================================================
+\section{Solving the regression}
+\label{sec:solve}
+
+\subsection{The objective}
+We cannot make the leftovers $\mathbf{E}$ exactly zero (there is always input and
+noise). Instead we choose the $\Amat$ whose prediction $\Amat\Xp$ is as close as
+possible to $\Xn$ --- smallest total squared error:
+\begin{equation}
+\widehat{\Amat} \;=\; \arg\min_{\Amat}\; \big\|\,\Xn - \Amat\,\Xp\,\big\|_F^2 ,
+\label{eq:ols}
+\end{equation}
+where $\|\cdot\|_F^2$ just means ``sum of all squared entries''.
+
+\subsection{The closed-form solution}
+Setting the derivative of \eqref{eq:ols} with respect to $\Amat$ to zero gives the
+\emph{normal equations}, and solving them yields:
+\begin{equation}
+\boxed{\;\widehat{\Amat} \;=\; \mathbf{C}_{\text{np}}\,\mathbf{C}_{\text{pp}}^{-1}\;}
+\qquad
+\begin{aligned}
+\mathbf{C}_{\text{pp}} &= \Xp\,\Xp^{\!\top} \quad(\text{past vs.\ past}),\\
+\mathbf{C}_{\text{np}} &= \Xn\,\Xp^{\!\top} \quad(\text{next vs.\ past}).
+\end{aligned}
+\label{eq:normal}
+\end{equation}
+Both $\mathbf{C}_{\text{pp}}$ and $\mathbf{C}_{\text{np}}$ are only $N\times N$,
+\emph{no matter how long the recording is}. They are sums over time steps, so
+they can be accumulated chunk by chunk --- which is why the method scales to very
+long recordings and large $N$ without ever loading all the data at once.
+
+\subsection{When there is no formula}
+The clean formula \eqref{eq:normal} exists only for plain least squares and for
+the ridge penalty (Section~\ref{sec:reg}). Once we add a sparsity penalty, no
+closed form exists, and we instead \emph{iterate}: start from a guess, repeatedly
+nudge $\Amat$ downhill on the objective (gradient descent / FISTA) until it stops
+improving. The target is the same; only the route to it changes.
+
+% ======================================================================
+\section{The external input and the residual}
+\label{sec:residual}
+
+The leftover term $\eps(t)$ deserves its own section, because it decides whether
+the estimate is trustworthy.
+
+\paragraph{What the residual is.}
+At the true $\Amat$, the leftover is
+\begin{equation}
+\eps(t) \;=\; \xx(t) - \Amat\,\xx(t-1) \;=\; \underbrace{\uu(t)}_{\text{external input}} + \;\text{noise} .
+\end{equation}
+So the residual is \emph{the external input plus noise}. There are two ways to
+handle the input, and they differ only in \emph{where the input is put}.
+
+\paragraph{Version 1 --- input left in the residual (what the method does).}
+We subtract each neuron's mean (``centering'') and do not model the input
+explicitly. The constant part of the input sets the average activity and is
+removed by centering; the fluctuating part stays inside $\eps(t)$.
+
+\paragraph{Version 2 --- input modeled explicitly.}
+We keep $\uu(t)$ as a separate term, so the residual contains only noise.
+
+\paragraph{When are the two the same?}
+Least squares gives the correct (unbiased) $\Amat$ \emph{exactly when the residual
+is uncorrelated with the regressor} $\xx(t-1)$. Everything hinges on one
+question: \emph{is the external input correlated with the network's own past
+activity?}
+\begin{itemize}
+\item \textbf{Case A --- independent input} (e.g.\ a separate, random drive to
+each neuron, as in the Brunel simulation). The input is uncorrelated with the
+past, so Versions 1 and 2 give the \emph{same} $\Amat$. The input only
+\emph{inflates the residual variance} --- you need more data for the same
+precision, but the estimate is \textbf{not biased}.
+\item \textbf{Case B --- shared / common input} (the same external signal drives
+several neurons at once). Now the input \emph{is} correlated with the past, the
+residual is correlated with the regressor, and $\Amat$ becomes \textbf{biased}: it
+reports \emph{phantom connections} between neurons that merely share input but
+have no synapse. This is the same thing as the ``hidden neuron'' problem: an
+unobserved neuron driving two visible ones looks like a connection between them.
+\end{itemize}
+
+\paragraph{How incomplete is the theory if we ignore the input?}
+Under independent input (our simulations) it is \emph{not} incomplete for getting
+connectivity right --- ignoring the input costs only precision, not correctness.
+Under common input (likely in real brains) it is genuinely incomplete: the bias
+is a \emph{confound}, and no amount of regularization removes a confound. This is
+the single most important limitation to state honestly.
+
+\paragraph{A free diagnostic.}
+Because the residual \emph{is} the input plus noise, its structure is
+informative. Compute the residuals and check their correlation across neurons:
+\emph{uncorrelated} residuals indicate Case~A (safe); \emph{correlated} residuals
+warn of common input (Case~B).
+
+% ======================================================================
+\section{Regularization: different versions}
+\label{sec:reg}
+
+Plain least squares can overfit: with $N^2$ unknowns and limited, noisy data it
+tends to fill the matrix with small spurious entries. \emph{Regularization} adds
+a penalty that encodes what we believe about connectivity --- mainly that it is
+\emph{sparse} (most pairs are not connected). Each penalty is a different
+hypothesis.
+
+\subsection{Ridge (L2): shrink everything}
+\begin{equation}
+\min_{\Amat}\;\|\Xn-\Amat\Xp\|_F^2 + \lambda\|\Amat\|_F^2
+\quad\Longrightarrow\quad
+\widehat{\Amat}=\mathbf{C}_{\text{np}}\,(\mathbf{C}_{\text{pp}}+\lambda I)^{-1}.
+\end{equation}
+Adding $\lambda I$ stabilizes the inverse and pulls all entries toward zero, but
+\emph{none} become exactly zero --- the matrix stays dense. Still a closed form.
+
+\subsection{Lasso (L1): force entries to exactly zero}
+\begin{equation}
+\min_{\Amat}\;\|\Xn-\Amat\Xp\|_F^2 + \lambda\|\Amat\|_1 ,
+\qquad \|\Amat\|_1=\sum_{ij}|a_{ij}| .
+\end{equation}
+The L1 penalty sets small weights \emph{exactly} to zero, producing a sparse
+matrix --- directly addressing the spurious connections. It has no closed form
+(the absolute value is not differentiable at zero), so it is solved iteratively
+(FISTA / coordinate descent).
+
+\subsection{Elastic Net: sparse \emph{and} stable}
+\begin{equation}
+\min_{\Amat}\;\|\Xn-\Amat\Xp\|_F^2 + \lambda_1\|\Amat\|_1 + \lambda_2\|\Amat\|_F^2 .
+\end{equation}
+Elastic Net combines the two penalties: L1 \emph{selects} (drives most entries to
+exactly zero) and L2 \emph{stabilizes}.
+
+\paragraph{Why not Lasso (L1) alone?}
+Lasso's well-known weakness is \emph{correlated predictors}. When two neurons have
+nearly identical activity the fit cannot tell them apart, so Lasso keeps one and
+zeros the other \emph{arbitrarily} --- and which one it keeps can flip with a
+little extra noise or data. A genuine connection can therefore be dropped only
+because a correlated neighbour ``won the coin toss''. Adding the L2 term cures
+this through the \emph{grouping effect}: rather than picking a single winner, L2
+shares similar weight among correlated neurons, so the selection is stable and the
+underlying linear algebra is better conditioned. Elastic Net thus keeps Lasso's
+sparsity while removing its fragility, which is why it is the safer default.
+
+\paragraph{A caveat for the present data.}
+The benefit of L2 is only as large as the correlations it guards against. In the
+$N=100$ network at the optimal lag the neurons are weakly correlated, so Lasso and
+Elastic Net score almost the same and L2 is nearly idle. The reason to keep it is
+forward-looking: as networks grow larger and denser the inter-neuron correlations
+increase and Lasso's instability begins to bite --- exactly the regime Elastic Net
+is insurance against.
+
+\subsection{Biological constraints (Dale's law)}
+A real neuron is typically \emph{either} excitatory \emph{or} inhibitory for all
+of its outgoing connections (Dale's law). Let $t_j\in\{+1,-1\}$ be the type of the
+\emph{source} neuron $j$ ($+1$ excitatory, $-1$ inhibitory); Dale's law says every
+entry in column $j$ of $\Amat$ should share that sign. We can write this as a
+penalty added to the Elastic Net loss:
+\begin{equation}
+L_{\text{Dale}}(\Amat)=
+\|\Xn-\Amat\Xp\|_F^2
++\lambda_1\|\Amat\|_1
++\lambda_2\|\Amat\|_F^2
++\lambda_D\!\sum_{i\neq j}\big[-t_j\,a_{ij}\big]_{+},
+\label{eq:dale-soft}
+\end{equation}
+where $[z]_+=\max(z,0)$. The final term --- a one-sided \emph{hinge} --- is zero
+when an entry has the correct sign ($t_j a_{ij}\ge 0$) and grows with the size of
+the violation when the sign is wrong; $\lambda_D$ sets how dearly a wrong sign is
+charged. Letting $\lambda_D\to\infty$ forbids wrong signs outright, giving the
+equivalent \emph{hard-constrained} form
+\begin{equation}
+\widehat{\Amat}=\arg\min_{\Amat}\;
+\|\Xn-\Amat\Xp\|_F^2+\lambda_1\|\Amat\|_1+\lambda_2\|\Amat\|_F^2
+\quad\text{s.t.}\quad t_j\,a_{ij}\ge 0\;\;\forall\,i\neq j .
+\label{eq:dale-hard}
+\end{equation}
+
+\paragraph{How it is solved (and why \emph{during} the fit matters).}
+The hard form \eqref{eq:dale-hard} is enforced \emph{inside} the iterative solver:
+after each gradient-plus-soft-threshold step, every column is projected onto its
+allowed sign (keep correct-sign entries, zero the wrong-sign ones) --- the
+$\lambda_D\to\infty$ limit applied directly. Doing this during the fit, rather than
+as a one-off cleanup at the end, is what makes it work: each time a wrong-sign
+entry is zeroed, the next gradient step lets the surviving correct-sign entries
+\emph{re-grow} to explain that variance. A post-hoc cleanup instead deletes
+wrong-sign entries once and discards whatever they were explaining --- which is why
+the in-solver version detects connections better. The source types $t_j$ are taken
+from an initial Elastic-Net fit (the sign of each neuron's strongest outgoing
+entry); the soft form \eqref{eq:dale-soft} with finite $\lambda_D$ is the natural
+``soft Dale'' variant to sweep.
+
+\begin{table}[h]
+\centering
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{lcccl}
+\toprule
+\textbf{Method} & \textbf{Penalty} & \textbf{Sparse?} & \textbf{Closed form?} & \textbf{Solver}\\
+\midrule
+Least squares (OLS) & none & no & yes & normal equations\\
+Ridge & L2 & no & yes & normal equations $+\lambda I$\\
+Lasso & L1 & \textbf{yes} & no & iterative (FISTA)\\
+Elastic Net & L1+L2 & \textbf{yes} & no & iterative (FISTA)\\
+Dale-constrained & sign & \textbf{yes} & no & projected iterative\\
+\bottomrule
+\end{tabular}
+\caption{The regularization variants, all minimizing the same reconstruction
+error with different penalties.}
+\end{table}
+
+% ======================================================================
+\section{Reading and interpreting the result}
+
+For each entry of the solved table $\widehat{\Amat}$:
+\[
+a_{ij}>0 \Rightarrow \text{$j$ excites $i$},\qquad
+a_{ij}<0 \Rightarrow \text{$j$ inhibits $i$},\qquad
+a_{ij}\approx 0 \Rightarrow \text{no connection.}
+\]
+The diagonal $a_{ii}$ is the neuron's own carry-over (its intrinsic time
+constant), not a connection, so it is discarded.
+
+Recall from Section~\ref{sec:theory} that $a_{ij}\propto \text{gain}_i\cdot
+W_{ij}$. So the estimate gives the right \emph{sign} and \emph{relative} strength
+of connections --- this is the \emph{effective} connectivity. Recovering the raw
+synaptic weight $W_{ij}$ requires dividing out the per-neuron gain, which is what
+rescaling / balance corrections aim to do. When ground truth is available, the
+quality is scored by how well $\widehat{\Amat}$ matches the true matrix (e.g.\
+correlation, or area under the ROC curve for detecting connections).
+
+% ======================================================================
+\section{The whole picture, and the assumptions}
+
+\paragraph{The cascade.}
+Reading left to right is how the data is generated; the inference runs it
+backwards:
+\[
+\begin{aligned}
+W \;\to\; G \;\to\; \Amat=\exp(G\Delta) \;\to\; \text{activity}
+\;&\to\; \text{calcium}\\[-2pt]
+\;\xrightarrow{\text{deconvolve}}\; \text{feed }\xx
+\;\xrightarrow{\text{regression}}\; \widehat{\Amat} \;&\to\; \text{connectivity.}
+\end{aligned}
+\]
+
+\paragraph{The assumptions, in one place.}
+\begin{enumerate}
+\item The network is approximately linear (valid in the asynchronous-irregular regime).
+\item One time-lag is enough (the step $\Delta$ is short).
+\item Calcium is a linear filter of activity, with a known/estimated time constant.
+\item Deconvolution approximately inverts that filter (similar time constant across neurons).
+\item The residual is uncorrelated with the past --- i.e.\ \emph{independent} external input (Section~\ref{sec:residual}).
+\item Enough data: the number of time steps $T$ greatly exceeds $N^2$.
+\end{enumerate}
+Assumption 5 is the one most likely to fail in real data, and it is exactly the
+external-input / common-input issue. Everything else is either guaranteed by the
+simulation or testable by a parameter sweep.
+
+% ======================================================================
+\section*{Summary}
+\addcontentsline{toc}{section}{Summary}
+
+\begin{quote}
+``Each neuron depends on all the others'' $\to$ one equation per neuron $\to$
+stack neurons into a snapshot $\to$ stack many snapshots over time $\to$ find the
+one table $\Amat$ that predicts best $\to$ that table \emph{is} the connectivity.
+\end{quote}
+
+The least-squares solution $\widehat{\Amat}=\mathbf{C}_{\text{np}}
+\mathbf{C}_{\text{pp}}^{-1}$ is the core; the external input lives in the
+residual and is harmless when independent but biasing when shared; and
+regularization injects the prior that connectivity is sparse and sign-consistent.
+
+\vspace{1em}
+\hrule
+\vspace{0.6em}
+\small
+\noindent\textbf{Key references.}
+S.~Rotter \& M.~Diesmann, \emph{Exact digital simulation of time-invariant linear
+systems\ldots}, Biological Cybernetics (1999).\;
+N.~Brunel, \emph{Dynamics of sparsely connected networks of excitatory and
+inhibitory spiking neurons}, J.\ Comp.\ Neuroscience (2000).\;
+P.~Rupprecht \emph{et al.}, \emph{A database and deep learning toolbox for
+noise-optimized, generalized spike inference from calcium imaging}, Nature
+Neuroscience (2021).
+
+\end{document}

@@ -64,6 +64,8 @@ instead of max Pearson.
 
 **Docs (`docs/experiments/`):**
 - `README.md` — this file (entry point).
+- `landscape.md` — **parameter landscape overview**: every knob in one table (importance,
+  best setting, status) + what to tune + what to re-validate before scaling N up / HPC.
 - `notebook.md` — dated lab log, every experiment with conclusions + a "findings at a
   glance" table + open questions.
 - `methods_overview.md` — scoreboard of all 16 methods (detection/type/magnitude +

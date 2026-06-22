@@ -16,8 +16,12 @@ Updated 2026-06-19.
   true 5 even with true types). Add it, or estimate from rate statistics.
 
 ## B. Dale-regularization variants
-- **Soft vs hard Dale** (λ_Dale finite sweep) instead of the hard sign projection.
-- **Iterative types**: alternate {estimate types ↔ sign-constrained solve} to self-correct.
+- ~~**Soft vs hard Dale** (λ_Dale finite sweep).~~ **DONE (2026-06-22):** soft converges
+  to hard as λ_Dale grows; no softer sweet spot. Hard wins. *(dale_candidates_test)*
+- ~~**Iterative types**: alternate {estimate types ↔ sign-constrained solve}.~~ **DONE
+  (2026-06-22):** types are already a fixed point → identical to single-pass C1; does not
+  break the inhibitory-ID ceiling. EM-soft and no-guess min()-purity also tested, both
+  slightly worse. **C1 (hard in-solver Dale) frozen as the regularization step.**
 - **Dale + mixture + balance** as a single in-solver-then-postproc pipeline (once the
   median bug is fixed).
 

@@ -68,6 +68,42 @@ which params were held fixed.
 **Next:** follow-up ideas.
 -->
 
+### 2026-06-22 — Dale-regularization candidates: does anything beat hard in-solver Dale?
+**Question:** Can soft Dale, iterative type-refinement, EM-soft, or a no-guess
+min()-purity penalty beat the current champion C1 (hard in-solver Dale, strongest-entry
+types)?
+
+**Setup:** N=100 feed, lag 1.5 ms, EN base (L1=3e-3, L2=1e-3). All reuse the FISTA core.
+Script: `scripts/dale_candidates_test.py` → `results/dale_candidates_test/ledger.csv`.
+
+**Result (detection F1 / type_acc / dale / spearman; magnitude unchanged, pearson ≈ 0.34):**
+| method | f1 | type_acc | dale | spearman |
+|---|---|---|---|---|
+| C1 hard (champion) | 0.515 | 0.920 | 1.000 | 0.470 |
+| C1 hard (TRUE types, ceiling) | 0.525 | 1.000 | 1.000 | 0.486 |
+| C2 soft (λ_D→0.1) | 0.515 | 0.920 | 1.000 | 0.470 |
+| C3 iterative hard | 0.515 | 0.920 | 1.000 | 0.470 |
+| C4 EM soft | 0.499 | 0.890 | 0.917 | 0.464 |
+| C5 min() no-guess (best, λ_D=0.01) | 0.501 | 0.870 | 0.953 | 0.459 |
+
+**Conclusion — nothing beats C1:**
+1. **Soft Dale (C2) converges to hard as λ_D grows** — hard is the correct limit; no softer
+   sweet spot exists.
+2. **Iterative refinement (C3) = C1 exactly** — the strongest-entry types are already a
+   fixed point, so iteration does NOT break the inhibitory-ID ceiling.
+3. **EM-soft (C4) and no-guess min() (C5) are slightly worse**; C5's E/I collapses to 0 at
+   λ_D ≥ 0.03 (the predicted over-purify/global-shrinkage failure of the no-guess route).
+4. The type ceiling (0.92 vs true 1.00) is **intrinsic to the strongest-entry signal** —
+   only TRUE types lift it, and even then F1 only 0.515→0.525. C1 is at the ceiling.
+
+**Decision:** Freeze **C1 (hard in-solver Dale, strongest-entry types)** as the
+regularization step. Proceed with the balance rescale + HPC scale-up.
+
+**Next:** none for Dale. The residual inhibitory-ID gap needs external information
+(cell-type labels), not better optimization.
+
+---
+
 ### 2026-06-19 — FULL unsupervised pipeline (composition fixed)
 **Question:** Make detection (daleReg) and magnitude (balance) compose into one
 unsupervised pipeline — fix the median/zero bug.
