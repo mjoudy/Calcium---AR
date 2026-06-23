@@ -78,6 +78,7 @@ def _get_data(config: ExperimentConfig) -> tuple[np.ndarray, np.ndarray, np.ndar
         sim_time=config.sim_time,
         dt=config.dt,
         n_threads=config.n_threads,
+        seed=config.seed,
     )
     net.build()
     net.run()

@@ -62,6 +62,10 @@ class BrunelNetwork:
         Simulation time resolution (ms).
     n_threads : int
         Number of CPU threads for NEST.
+    seed : int
+        Seed for NEST's random number generator. Together with n_threads this
+        fully determines the network wiring and spike trains (NEST's RNG stream
+        depends on the number of threads, so reproducibility needs both fixed).
     """
 
     def __init__(
@@ -78,6 +82,7 @@ class BrunelNetwork:
         sim_time: float = 1000.0,
         dt: float = 0.1,
         n_threads: int = 1,
+        seed: int = 42,
     ):
         self.NE = n_excitatory
         self.NI = n_inhibitory
@@ -93,6 +98,7 @@ class BrunelNetwork:
         self.sim_time = sim_time
         self.dt = dt
         self.n_threads = n_threads
+        self.seed = seed
 
         # Integer in-degrees
         self.CE = max(1, int(epsilon * n_excitatory))
@@ -133,6 +139,7 @@ class BrunelNetwork:
         nest.SetKernelStatus({
             "local_num_threads": self.n_threads,
             "resolution": self.dt,
+            "rng_seed": self.seed,   # makes the network wiring + spike trains reproducible
             "print_time": False,
             "overwrite_files": True,
         })
