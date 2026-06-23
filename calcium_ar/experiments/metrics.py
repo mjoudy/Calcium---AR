@@ -270,6 +270,50 @@ def performance_score(adj_inferred: np.ndarray, adj_true: np.ndarray) -> float:
     return score / len(classes)
 
 
+def _macro_prf(
+    adj_inferred: np.ndarray, adj_true: np.ndarray
+) -> tuple[float, float, float]:
+    """Per-class (one-vs-rest) precision/recall/F1 over the 3 classes
+    {-1 inhibitory, 0 unconnected, +1 excitatory}, macro-averaged (each class
+    weighted equally — the rare inhibitory class is not drowned out by the huge
+    unconnected class). Classes absent from the ground truth are skipped.
+    Returns (macro_precision, macro_recall, macro_f1)."""
+    y_true, y_pred = _ternary_labels(adj_inferred, adj_true)
+    ps, rs, fs = [], [], []
+    for c in (-1, 0, 1):
+        if (y_true == c).sum() == 0:
+            continue
+        tp = int(((y_pred == c) & (y_true == c)).sum())
+        fp = int(((y_pred == c) & (y_true != c)).sum())
+        fn = int(((y_pred != c) & (y_true == c)).sum())
+        p = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+        r = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+        f = 2 * p * r / (p + r) if (p + r) > 0 else 0.0
+        ps.append(p); rs.append(r); fs.append(f)
+    if not ps:
+        return float("nan"), float("nan"), float("nan")
+    return float(np.mean(ps)), float(np.mean(rs)), float(np.mean(fs))
+
+
+@connectivity_metrics.register
+def macro_precision(adj_inferred: np.ndarray, adj_true: np.ndarray) -> float:
+    """Macro-averaged 3-class precision (E / unconnected / I), one-vs-rest."""
+    return _macro_prf(adj_inferred, adj_true)[0]
+
+
+@connectivity_metrics.register
+def macro_recall(adj_inferred: np.ndarray, adj_true: np.ndarray) -> float:
+    """Macro-averaged 3-class recall = balanced accuracy (E / unconnected / I).
+    Same quantity as performance_score, exposed under the standard name."""
+    return _macro_prf(adj_inferred, adj_true)[1]
+
+
+@connectivity_metrics.register
+def macro_f1(adj_inferred: np.ndarray, adj_true: np.ndarray) -> float:
+    """Macro-averaged 3-class F1 (E / unconnected / I), one-vs-rest."""
+    return _macro_prf(adj_inferred, adj_true)[2]
+
+
 @connectivity_metrics.register
 def exc_unc_overlap(adj_inferred: np.ndarray, adj_true: np.ndarray) -> float:
     """
