@@ -46,6 +46,13 @@ class ExperimentResult:
     adj_inferred_path: str
 
     # ------------------------------------------------------------------ #
+    # Code provenance — which commit produced this run
+    # (defaults keep older saved runs loadable)
+    # ------------------------------------------------------------------ #
+    git_commit: str = "unknown"
+    git_dirty: bool = False
+
+    # ------------------------------------------------------------------ #
     # Convenience accessors
     # ------------------------------------------------------------------ #
 
@@ -54,9 +61,11 @@ class ExperimentResult:
         return self.metrics.get(key, default)
 
     def summary(self) -> dict:
-        """Flat dict ready for a DataFrame row (metrics + timing + run_dir)."""
+        """Flat dict ready for a DataFrame row (metrics + timing + provenance + run_dir)."""
         row = dict(self.metrics)
         row["duration_s"] = self.duration_seconds
         row["timestamp"]  = self.timestamp
+        row["git_commit"] = self.git_commit
+        row["git_dirty"]  = self.git_dirty
         row["run_dir"]    = self.run_dir
         return row

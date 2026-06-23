@@ -99,6 +99,8 @@ def save_result(
     metrics_payload = dict(result.metrics)
     metrics_payload["duration_s"] = result.duration_seconds
     metrics_payload["timestamp"]  = result.timestamp
+    metrics_payload["git_commit"] = result.git_commit
+    metrics_payload["git_dirty"]  = result.git_dirty
     (run_dir / "metrics.json").write_text(
         json.dumps(metrics_payload, indent=2, cls=_NumpyEncoder)
     )
@@ -128,8 +130,10 @@ def load_result(run_dir: str | Path) -> tuple[ExperimentResult, ExperimentConfig
     loss_curve = np.load(run_dir / "loss_curve.npy").tolist()
 
     # Separate run-meta keys from metric keys
-    duration  = payload.pop("duration_s")
-    timestamp = payload.pop("timestamp")
+    duration   = payload.pop("duration_s")
+    timestamp  = payload.pop("timestamp")
+    git_commit = payload.pop("git_commit", "unknown")   # older runs predate provenance
+    git_dirty  = payload.pop("git_dirty", False)
 
     result = ExperimentResult(
         config_path      = str(run_dir / "config.json"),
@@ -143,6 +147,8 @@ def load_result(run_dir: str | Path) -> tuple[ExperimentResult, ExperimentConfig
         feed_zarr_path   = str(run_dir / "feed.zarr"),
         adj_true_path    = str(run_dir / "adj_true.npy"),
         adj_inferred_path= str(run_dir / "adj_inferred.npy"),
+        git_commit       = git_commit,
+        git_dirty        = git_dirty,
     )
     return result, config
 

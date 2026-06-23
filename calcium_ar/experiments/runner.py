@@ -30,6 +30,7 @@ from .. import solvers as _slv
 from .config import ExperimentConfig
 from .result import ExperimentResult
 from .persistence import make_run_dir, save_feed_zarr, save_result
+from .provenance import git_revision
 from .metrics import compute_all as compute_metrics
 
 
@@ -161,6 +162,7 @@ def run_single(config: ExperimentConfig) -> ExperimentResult:
 
     t_start   = time.perf_counter()
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
+    git_info  = git_revision()   # which commit (and is it dirty) produced this run
 
     # ------------------------------------------------------------------ #
     # Derived sample-domain quantities from physical-unit config fields
@@ -276,6 +278,8 @@ def run_single(config: ExperimentConfig) -> ExperimentResult:
         feed_zarr_path    = feed_zarr_path,
         adj_true_path     = str(run_dir / "adj_true.npy"),
         adj_inferred_path = str(run_dir / "adj_inferred.npy"),
+        git_commit        = git_info["git_commit"],
+        git_dirty         = git_info["git_dirty"],
     )
 
     # ------------------------------------------------------------------ #
