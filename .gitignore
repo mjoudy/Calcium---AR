@@ -15,8 +15,15 @@ envs/
 *.pickle
 *.npz
 
-# Experiment results (large outputs)
-results/
+# Experiment results: keep the big arrays OUT, but track the ledger.csv records
+# (tiny text files = the scientific record of what was run + the numbers + the
+# code commit). Big arrays stay out via the *.npy/*.zarr/etc rules above plus the
+# blanket results/** rule here. To also version per-run configs/metrics, add:
+#   !results/**/config.json
+#   !results/**/metrics.json
+results/**
+!results/**/
+!results/**/ledger.csv
 scripts/sanity_n100_output/
 scripts/sanity_n1250_output/
 
