@@ -21,10 +21,10 @@
 set -eo pipefail
 
 # --------------------------------------------------------------------------- #
-# Environment: load conda, activate the env that lives in the workspace.
+# Environment: point at the env that lives in the workspace.
 # --------------------------------------------------------------------------- #
-module load conda
 WS=$(ws_find calcium_ar)
+PY="$WS/env/bin/python"     # call the env's python directly (most reliable in batch)
 
 cd "$WS/Calcium---AR"
 
@@ -45,7 +45,7 @@ echo "workdir: $WS"
 echo "============================================="
 
 # --------------------------------------------------------------------------- #
-# Run. 'conda run' reliably activates the workspace env in a non-interactive
-# job — plain 'conda activate' often does not take effect in batch shells.
+# Run. Call the env's python by full path — the most reliable method in a batch
+# job (both 'conda activate' and 'conda run' failed to use the env here).
 # --------------------------------------------------------------------------- #
-conda run --no-capture-output -p "$WS/env" python scripts/run_n1250.py
+"$PY" scripts/run_n1250.py
