@@ -51,3 +51,7 @@ scripts-hpc/dask_pipeline/data/
 
 # Large NEST simulation logs in archive
 _arxiv/scripts-hpc/dask_pipeline/*.txt
+
+# SLURM job logs (keep the folder, ignore the logs)
+slurm_logs/*
+!slurm_logs/.gitkeep
