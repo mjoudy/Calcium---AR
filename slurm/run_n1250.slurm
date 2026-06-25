@@ -25,8 +25,6 @@ set -eo pipefail
 # --------------------------------------------------------------------------- #
 module load conda
 WS=$(ws_find calcium_ar)
-source "$(conda info --base)/etc/profile.d/conda.sh"
-conda activate "$WS/env"
 
 cd "$WS/Calcium---AR"
 
@@ -42,13 +40,12 @@ echo "================== run info =================="
 echo "host:    $(hostname)"
 echo "date:    $(date)"
 echo "git:     $GIT_COMMIT (dirty: $GIT_DIRTY)"
-echo "python:  $(which python)"
-echo "nest:    $(python -c 'import nest; print(nest.__version__)')"
 echo "cpus:    ${SLURM_CPUS_PER_TASK}"
 echo "workdir: $WS"
 echo "============================================="
 
 # --------------------------------------------------------------------------- #
-# Run.
+# Run. 'conda run' reliably activates the workspace env in a non-interactive
+# job — plain 'conda activate' often does not take effect in batch shells.
 # --------------------------------------------------------------------------- #
-python scripts/run_n1250.py
+conda run --no-capture-output -p "$WS/env" python scripts/run_n1250.py

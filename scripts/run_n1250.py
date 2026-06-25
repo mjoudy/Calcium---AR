@@ -65,6 +65,11 @@ config = ExperimentConfig(
 
 
 if __name__ == "__main__":
+    import sys
+    import numpy
+    import nest
+    print(f"[run_n1250] python : {sys.executable}")
+    print(f"[run_n1250] nest {nest.__version__} | numpy {numpy.__version__}")
     print(f"[run_n1250] workdir = {WORKDIR}")
     result = run_single(config)
     print(
