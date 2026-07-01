@@ -28,9 +28,9 @@ from calcium_ar.experiments.config import ExperimentConfig
 from calcium_ar.experiments.runner import run_single
 from calcium_ar.experiments.metrics import connectivity_metrics
 from calcium_ar.data.dataset import SimulatedDataset
+from calcium_ar.solvers import dale_fista
 from calcium_ar.postprocessing import (
     strongest_entry_types,
-    dale_fista,
     rescale_balance_nz,
 )
 

@@ -35,3 +35,8 @@ def solve_sklearn_lasso(*args, **kwargs):
 def solve_fista(*args, **kwargs):
     from .fista import solve
     return solve(*args, **kwargs)
+
+
+# Dale-regularized solver (two-stage: needs types from a first pass, so it takes
+# the data + types directly rather than the standard solve(zarr_path, ...) form).
+from .dale_fista import dale_fista

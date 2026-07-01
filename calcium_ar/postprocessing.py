@@ -6,9 +6,9 @@ runner. They were previously copy-pasted across several analysis scripts; this
 module is the single canonical home.
 
 Two jobs:
-- **Dale** — fix the signs. Either a hard cleanup (`dale_cleanup`) or, better, a
-  sign-constrained re-solve (`dale_fista`) that forces every neuron's outgoing
-  weights to one sign (all excitatory or all inhibitory).
+- **Dale (post-hoc)** — `dale_cleanup` zeros wrong-sign entries of a finished
+  matrix. The stronger *in-solver* Dale is a solver, not post-processing: see
+  `calcium_ar.solvers.dale_fista`.
 - **Balance** — fix the magnitude. `rescale_balance_nz` rescales inhibitory
   weights so the E/I strength ratio matches `g`, estimated from the network
   balance (`balance_g`) using only observable firing rates + population sizes.
@@ -48,46 +48,6 @@ def dale_cleanup(A: np.ndarray) -> np.ndarray:
         B[:, j] = col
     np.fill_diagonal(B, 0.0)
     return B
-
-
-def dale_fista(
-    X: np.ndarray,
-    Y: np.ndarray,
-    types: np.ndarray,
-    lam1: float = 3e-3,
-    lam2: float = 1e-3,
-    n_iter: int = 800,
-) -> np.ndarray:
-    """Sign-constrained Elastic Net (Dale as regularization) via FISTA.
-
-    Solves the AR regression again, but projects each column to its allowed sign
-    (`types`) every iteration, so the result obeys Dale's law by construction.
-
-    Parameters
-    ----------
-    X, Y : (N, M) centred lag pairs (predictors / targets).
-    types : (N,) +1 / -1 sign allowed per source column (e.g. from
-        strongest_entry_types on a first-pass solution).
-    lam1, lam2 : L1 / L2 strengths.
-    """
-    N, M = X.shape
-    Cxx = (X @ X.T) / M
-    Cyx = (Y @ X.T) / M
-    Lip = np.linalg.eigvalsh(Cxx)[-1] + lam2
-    thr = lam1 / Lip
-    tcol = types[None, :]
-    A = np.zeros((N, N))
-    Z = A.copy()
-    tk = 1.0
-    for _ in range(n_iter):
-        V = Z - (Z @ Cxx - Cyx + lam2 * Z) / Lip
-        V = np.sign(V) * np.maximum(np.abs(V) - thr, 0.0)   # L1 soft-threshold
-        V = tcol * np.maximum(tcol * V, 0.0)                # per-column sign projection
-        tnew = (1 + np.sqrt(1 + 4 * tk * tk)) / 2
-        Z = V + ((tk - 1) / tnew) * (V - A)
-        A, tk = V, tnew
-    np.fill_diagonal(A, 0.0)
-    return A
 
 
 def balance_g(types: np.ndarray, rates: np.ndarray) -> float:
