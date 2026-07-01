@@ -37,7 +37,7 @@ from calcium_ar.postprocessing import strongest_entry_types, rescale_balance_nz
 
 
 WORKDIR = os.environ.get("CALCIUM_AR_WORKDIR", ".")
-SEEDS = [0, 1, 2, 3, 4]
+SEEDS = [1, 2, 3, 4, 5]   # NEST requires seed >= 1 (seed 0 is invalid)
 
 # reference operating point (the fixed knobs; each sweep moves one of them)
 REF_TAU, REF_T, REF_LAG, REF_LAM = 100.0, 50_000.0, 1.5, 1e-4

@@ -99,6 +99,10 @@ class BrunelNetwork:
         self.dt = dt
         self.n_threads = n_threads
         self.seed = seed
+        if seed < 1:
+            raise ValueError(
+                f"seed must be >= 1 (NEST's RNG seed range is 1..2^32-1); got {seed}"
+            )
 
         # Integer in-degrees
         self.CE = max(1, int(epsilon * n_excitatory))
