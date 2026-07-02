@@ -163,7 +163,9 @@ def make_panel(run_dir, stage="EN+Dale", out=None):
 
     run_dir = Path(run_dir)
     config = ExperimentConfig.from_json(run_dir / "config.json")
-    adj_true = np.load(run_dir / "adj_true.npy")
+    # adj_inferred uses source=column; adj_true is stored source=row. Transpose to
+    # the estimated convention so every panel aligns (see metrics.py convention note).
+    adj_true = np.load(run_dir / "adj_true.npy").T
     mats = {
         "EN": run_dir / "adj_inferred.npy",
         "EN+Dale": run_dir / "adj_dale.npy",
