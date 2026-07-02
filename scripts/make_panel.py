@@ -97,6 +97,29 @@ def _eigs(ax, est, adj_true, max_n=5000):
     ax.legend(fontsize=7)
 
 
+def _confusion(ax, est, adj_true, eps=1e-9):
+    """3-class confusion matrix (true vs predicted: E / unconnected / I) over
+    off-diagonal entries. Prediction = sign of the estimated weight (0 = none)."""
+    off = ~np.eye(adj_true.shape[0], dtype=bool)
+
+    def lab(A):
+        s = np.sign(A[off]).astype(int)
+        s[np.abs(A[off]) <= eps] = 0
+        return s
+
+    t, p = lab(adj_true), lab(est)
+    classes, names = [1, 0, -1], ["E", "none", "I"]
+    M = np.array([[int(np.sum((t == ct) & (p == cp))) for cp in classes]
+                  for ct in classes])
+    ax.imshow(M, cmap="Blues")
+    ax.set(xticks=[0, 1, 2], yticks=[0, 1, 2], xticklabels=names, yticklabels=names,
+           xlabel="predicted", ylabel="true", title="confusion (3-class)")
+    for i in range(3):
+        for j in range(3):
+            ax.text(j, i, f"{M[i, j]:,}", ha="center", va="center", fontsize=8,
+                    color="white" if M[i, j] > M.max() / 2 else "black")
+
+
 def _random_neurons(ax, est, adj_true, n=4, seed=0):
     rng = np.random.default_rng(seed)
     N = adj_true.shape[0]
@@ -126,7 +149,7 @@ def render(adj_true, est, spikes, calcium, dt, title, out_path):
     _three_class(ax[4], est, adj_true)
     _eigs(ax[5], est, adj_true)
     _random_neurons(ax[6], est, adj_true)
-    ax[7].axis("off")
+    _confusion(ax[7], est, adj_true)
     fig.suptitle(title, fontsize=13)
     fig.tight_layout(rect=(0, 0, 1, 0.97))
     fig.savefig(out_path, dpi=120)
