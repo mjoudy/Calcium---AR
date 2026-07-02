@@ -47,6 +47,7 @@ class ExperimentConfig:
                                     # enforced odd and >= 5
     tau_method: str     = "ransac"  # ols | ransac | dbscan | iqr | zscore
     spike_cut_window: int = 5       # half-window around spikes to remove
+    preprocess: bool    = True      # False = deconvolution OFF: solve on raw calcium
 
     # ------------------------------------------------------------------ #
     # Solver

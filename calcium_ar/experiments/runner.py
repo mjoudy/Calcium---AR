@@ -200,25 +200,30 @@ def run_single(config: ExperimentConfig) -> ExperimentResult:
         spikes       = None
         fluorescence = None
 
-        # Estimate tau from the first 100k samples (fits comfortably in RAM)
-        _N, _T = calcium_zarr.shape
-        sub_T   = min(100_000, _T)
-        cal_sub = np.asarray(calcium_zarr[:, :sub_T])
-        tau_est = estimate_tau_robust(
-            cal_sub,
-            window_length=smooth_win,
-            method=config.tau_method,
-            dt=config.dt,
-        )
+        if config.preprocess:
+            # Estimate tau from the first 100k samples (fits comfortably in RAM)
+            _N, _T = calcium_zarr.shape
+            sub_T   = min(100_000, _T)
+            cal_sub = np.asarray(calcium_zarr[:, :sub_T])
+            tau_est = estimate_tau_robust(
+                cal_sub,
+                window_length=smooth_win,
+                method=config.tau_method,
+                dt=config.dt,
+            )
 
-        # Chunked feed reconstruction writes directly to zarr on disk
-        feed_zarr_path = str(run_dir / "feed.zarr")
-        stream_feed_to_zarr(
-            calcium_zarr, feed_zarr_path, tau_est,
-            window_length=smooth_win,
-            chunk_size=config.chunk_size,
-            dt=config.dt,
-        )
+            # Chunked feed reconstruction writes directly to zarr on disk
+            feed_zarr_path = str(run_dir / "feed.zarr")
+            stream_feed_to_zarr(
+                calcium_zarr, feed_zarr_path, tau_est,
+                window_length=smooth_win,
+                chunk_size=config.chunk_size,
+                dt=config.dt,
+            )
+        else:
+            # Deconvolution OFF: solve directly on the raw calcium zarr
+            tau_est = config.tau
+            feed_zarr_path = str(Path(config.data_path) / "calcium.zarr")
     else:
         # -------------------------------------------------------------- #
         # In-memory path
@@ -226,16 +231,21 @@ def run_single(config: ExperimentConfig) -> ExperimentResult:
         spikes, fluorescence, adj_true = _get_data(config)
         np.fill_diagonal(adj_true, 0.0)
 
-        smooth, deriv = get_signal_derivative_pair(
-            fluorescence, window_length=smooth_win, delta=config.dt
-        )
-        tau_est = estimate_tau_robust(
-            fluorescence,
-            window_length=smooth_win,
-            method=config.tau_method,
-            dt=config.dt,
-        )
-        feed = reconstruct_feed(smooth, deriv, tau_est)
+        if config.preprocess:
+            smooth, deriv = get_signal_derivative_pair(
+                fluorescence, window_length=smooth_win, delta=config.dt
+            )
+            tau_est = estimate_tau_robust(
+                fluorescence,
+                window_length=smooth_win,
+                method=config.tau_method,
+                dt=config.dt,
+            )
+            feed = reconstruct_feed(smooth, deriv, tau_est)
+        else:
+            # Deconvolution OFF: solve directly on raw calcium
+            tau_est = config.tau
+            feed = fluorescence
         feed_zarr_path = save_feed_zarr(feed, run_dir)
 
     # ------------------------------------------------------------------ #

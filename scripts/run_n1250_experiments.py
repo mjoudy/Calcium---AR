@@ -42,6 +42,15 @@ SEEDS = [1, 2, 3, 4, 5]   # NEST requires seed >= 1 (seed 0 is invalid)
 # reference operating point (the fixed knobs; each sweep moves one of them)
 REF_TAU, REF_T, REF_LAG, REF_LAM = 100.0, 50_000.0, 1.5, 1e-4
 
+# --- config variant + preprocessing toggle (from env) ------------------------
+#   CFG=validated (g=5, J=0.8)  |  CFG=arxiv (g=6, J=8, old project regime)
+#   PREPROCESS=1 (deconvolve, default)  |  PREPROCESS=0 (raw calcium)
+CFG = os.environ.get("CFG", "validated")
+PREPROCESS = os.environ.get("PREPROCESS", "1") != "0"
+_NET = {"validated": dict(g=5.0, J_ex=0.8),
+        "arxiv":     dict(g=6.0, J_ex=8.0)}[CFG]
+_OTAG = CFG + ("" if PREPROCESS else "_rawcal")     # results subfolder tag
+
 # sweep name -> (ExperimentConfig field, values to try)
 SWEEPS = {
     "lag":  ("lag_ms",   [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0]),
@@ -61,17 +70,22 @@ def _fmt(v):
 
 
 def _data_path(seed, tau, sim_time):
-    return os.path.join(WORKDIR, "data", "N1250", f"s{seed}_tau{int(tau)}_T{int(sim_time)}")
+    # arxiv is a different network -> its own datasets; validated reuses existing prep
+    base = os.path.join(WORKDIR, "data", "N1250")
+    if CFG != "validated":
+        base = os.path.join(base, CFG)
+    return os.path.join(base, f"s{seed}_tau{int(tau)}_T{int(sim_time)}")
 
 
 def _config(seed, tau, sim_time, lag, lam, name, out_sub):
     return ExperimentConfig(
-        n_excitatory=1000, n_inhibitory=250, epsilon=0.1, g=5.0, eta=2.0,
-        J_ex=0.8, sim_time=sim_time, dt=0.1, n_threads=8,
-        tau=tau, smooth_window_ms=3.1, tau_method="ransac",
+        n_excitatory=1000, n_inhibitory=250, epsilon=0.1, eta=2.0,
+        g=_NET["g"], J_ex=_NET["J_ex"],
+        sim_time=sim_time, dt=0.1, n_threads=8,
+        tau=tau, smooth_window_ms=3.1, tau_method="ransac", preprocess=PREPROCESS,
         solver="fista", lag_ms=lag, lam=lam, lam_l2=1e-3, chunk_size=10_000,
         data_path=_data_path(seed, tau, sim_time),
-        output_dir=os.path.join(WORKDIR, "results", "n1250_sweeps", out_sub),
+        output_dir=os.path.join(WORKDIR, "results", "n1250_sweeps", _OTAG, out_sub),
         name=name, seed=seed,
     )
 
