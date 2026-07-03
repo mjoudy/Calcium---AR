@@ -1,17 +1,15 @@
 """
-7-panel diagnostic figure for one estimation run.
+Compact diagnostic panel for one estimation.
 
-Panels:
-  1. spike raster              — is the network firing (asynchronous-irregular)?
-  2. calcium traces + spikes   — the signal we infer from
-  3. ground-truth matrix
-  4. estimated matrix
-  5. three-class weight distribution (estimated weights split by true E / none / I)
-  6. eigenvalue spectrum (estimated vs true)
-  7. inferred-vs-true weights for a few random neurons
+Six cells: ground truth, estimated matrix, 3-class confusion (row-normalized),
+estimated-weight distribution by true class, a precision-recall curve, and a box
+of the key numbers.
 
-Reads the matrices from a run dir and the spikes/calcium from its dataset
-(resolved via the run's config.json).
+Note on orientation: adj_inferred[i,j] <-> adj_true.T[i,j] (see metrics.py). So the
+ground truth is transposed to the estimate's convention for the visuals, while the
+metric functions get the raw adj_true (they transpose internally).
+
+_raster / _calcium are kept here because scripts/network_stats.py imports them.
 
 Usage:
     python scripts/make_panel.py <run_dir> [--stage EN|EN+Dale|EN+Dale+balance] [--out fig.png]
@@ -31,7 +29,7 @@ import matplotlib.pyplot as plt
 
 
 # --------------------------------------------------------------------------- #
-# individual panels (all take a matplotlib axis + arrays -> easy to test)
+# network-signal helpers (used by scripts/network_stats.py)
 # --------------------------------------------------------------------------- #
 
 def _raster(ax, spikes, dt, n_show=120, t_ms=1000.0):
@@ -59,6 +57,10 @@ def _calcium(ax, calcium, spikes, dt, n_show=3, t_ms=2000.0):
     ax.set(title="calcium traces + spikes", xlabel="time (ms)", ylabel="ΔF (offset)")
 
 
+# --------------------------------------------------------------------------- #
+# panel pieces
+# --------------------------------------------------------------------------- #
+
 def _matrix(ax, A, title):
     nz = np.abs(A[A != 0])
     v = np.percentile(nz, 99) if nz.size else 1.0
@@ -67,91 +69,94 @@ def _matrix(ax, A, title):
     plt.colorbar(im, ax=ax, fraction=0.046, pad=0.02)
 
 
-def _three_class(ax, est, adj_true):
-    off = ~np.eye(adj_true.shape[0], dtype=bool)
-    g = adj_true[off]
-    e = est[off]
+def _dist(ax, est, adj):
+    """Estimated-weight distribution split by TRUE class. Each class normalized to
+    its own area (density) so shapes are comparable despite the huge size gap;
+    log-y keeps the small E/I tails visible under the giant 'none' peak."""
+    off = ~np.eye(adj.shape[0], dtype=bool)
+    g, e = adj[off], est[off]
     for mask, lab, c in [(g > 0, "true E", "tab:red"),
                          (g == 0, "true none", "0.5"),
                          (g < 0, "true I", "tab:blue")]:
-        vals = e[mask]
-        if vals.size:
-            ax.hist(vals, bins=60, alpha=0.55, label=lab, color=c, density=True)
-    ax.set(title="estimated weight by true class", xlabel="estimated weight", ylabel="density")
+        v = e[mask]
+        if v.size:
+            ax.hist(v, bins=80, density=True, histtype="step", lw=1.6, label=lab, color=c)
+    ax.set(title="estimated weight by true class (density)",
+           xlabel="estimated weight", ylabel="density per class (log)")
+    ax.set_yscale("log")
     ax.legend(fontsize=7)
 
 
-def _eigs(ax, est, adj_true, max_n=5000):
-    N = adj_true.shape[0]
-    if N > max_n:
-        ax.text(0.5, 0.5, f"eigvals skipped\n(N={N} > {max_n})",
-                ha="center", va="center", transform=ax.transAxes)
-        ax.set(title="eigenvalue spectrum")
-        return
-    for A, c, lab in [(adj_true, "0.6", "true"), (est, "tab:green", "estimated")]:
-        w = np.linalg.eigvals(A)
-        ax.scatter(w.real, w.imag, s=6, alpha=0.5, color=c, label=lab)
-    ax.axhline(0, color="k", lw=0.4)
-    ax.axvline(0, color="k", lw=0.4)
-    ax.set(title="eigenvalue spectrum", xlabel="Re", ylabel="Im")
-    ax.legend(fontsize=7)
-
-
-def _confusion(ax, est, adj_true, eps=1e-9):
-    """3-class confusion matrix (true vs predicted: E / unconnected / I) over
-    off-diagonal entries. Prediction = sign of the estimated weight (0 = none)."""
-    off = ~np.eye(adj_true.shape[0], dtype=bool)
+def _confusion(ax, est, adj, eps=1e-9):
+    """3-class confusion (E / none / I), coloured by ROW-normalized rate (recall)
+    so it is comparable across configs. Cells show count + row %."""
+    off = ~np.eye(adj.shape[0], dtype=bool)
 
     def lab(A):
         s = np.sign(A[off]).astype(int)
         s[np.abs(A[off]) <= eps] = 0
         return s
 
-    t, p = lab(adj_true), lab(est)
+    t, p = lab(adj), lab(est)
     classes, names = [1, 0, -1], ["E", "none", "I"]
     M = np.array([[int(np.sum((t == ct) & (p == cp))) for cp in classes]
                   for ct in classes])
-    ax.imshow(M, cmap="Blues")
+    R = M / np.maximum(M.sum(1, keepdims=True), 1)
+    ax.imshow(R, cmap="Blues", vmin=0, vmax=1)
     ax.set(xticks=[0, 1, 2], yticks=[0, 1, 2], xticklabels=names, yticklabels=names,
-           xlabel="predicted", ylabel="true", title="confusion (3-class)")
+           xlabel="predicted", ylabel="true", title="confusion (row-normalized = recall)")
     for i in range(3):
         for j in range(3):
-            ax.text(j, i, f"{M[i, j]:,}", ha="center", va="center", fontsize=8,
-                    color="white" if M[i, j] > M.max() / 2 else "black")
+            ax.text(j, i, f"{M[i, j]:,}\n{R[i, j] * 100:.1f}%", ha="center", va="center",
+                    fontsize=8, color="white" if R[i, j] > 0.5 else "black")
 
 
-def _random_neurons(ax, est, adj_true, n=4, seed=0):
-    rng = np.random.default_rng(seed)
-    N = adj_true.shape[0]
-    js = rng.choice(N, size=min(n, N), replace=False)
-    lo = hi = 0.0
-    for j in js:
-        xt, ye = adj_true[:, j], est[:, j]
-        ax.scatter(xt, ye, s=8, alpha=0.6, label=f"neuron {j}")
-        lo = min(lo, xt.min(), ye.min())
-        hi = max(hi, xt.max(), ye.max())
-    ax.plot([lo, hi], [lo, hi], "k--", lw=0.5)
-    ax.set(title="inferred vs true (random neurons)", xlabel="true weight", ylabel="estimated weight")
+def _pr_curve(ax, est, adj, max_pts=3_000_000):
+    """Precision-recall for 'does a connection exist' (score = |estimate|).
+    PR is more honest than ROC here because 'none' hugely outnumbers connections."""
+    from sklearn.metrics import precision_recall_curve, average_precision_score
+    off = ~np.eye(adj.shape[0], dtype=bool)
+    y = (adj[off] != 0).astype(int)
+    s = np.abs(est[off])
+    if y.size > max_pts:                       # subsample for very large N
+        idx = np.random.default_rng(0).choice(y.size, max_pts, replace=False)
+        y, s = y[idx], s[idx]
+    pr, rc, _ = precision_recall_curve(y, s)
+    ap = average_precision_score(y, s)
+    ax.plot(rc, pr, lw=1.6)
+    ax.axhline(y.mean(), ls="--", c="0.6", lw=0.8, label=f"chance = {y.mean():.3f}")
+    ax.set(title=f"precision–recall  (AP = {ap:.3f})",
+           xlabel="recall", ylabel="precision", ylim=(0, 1.02))
     ax.legend(fontsize=7)
+
+
+def _metrics_box(ax, metrics):
+    ax.axis("off")
+    lines = [f"{k:>16s} : {v:.3f}" for k, v in metrics.items()]
+    ax.text(0.02, 0.97, "\n".join(lines), va="top", ha="left",
+            family="monospace", fontsize=11, transform=ax.transAxes)
+    ax.set_title("metrics")
 
 
 # --------------------------------------------------------------------------- #
 # assemble
 # --------------------------------------------------------------------------- #
 
-def render(adj_true, est, spikes, calcium, dt, title, out_path):
-    fig, axes = plt.subplots(2, 4, figsize=(20, 9))
+REPORT = ["pearson", "spearman", "auc_roc", "f1",
+          "precision", "recall", "macro_f1", "dale_type_accuracy"]
+
+
+def render(adj, est, metrics, title, out_path):
+    fig, axes = plt.subplots(2, 3, figsize=(16, 9))
     ax = axes.ravel()
-    _raster(ax[0], spikes, dt)
-    _calcium(ax[1], calcium, spikes, dt)
-    _matrix(ax[2], adj_true, "ground truth")
-    _matrix(ax[3], est, "estimated")
-    _three_class(ax[4], est, adj_true)
-    _eigs(ax[5], est, adj_true)
-    _random_neurons(ax[6], est, adj_true)
-    _confusion(ax[7], est, adj_true)
+    _matrix(ax[0], adj, "ground truth")
+    _matrix(ax[1], est, "estimated")
+    _confusion(ax[2], est, adj)
+    _dist(ax[3], est, adj)
+    _pr_curve(ax[4], est, adj)
+    _metrics_box(ax[5], metrics)
     fig.suptitle(title, fontsize=13)
-    fig.tight_layout(rect=(0, 0, 1, 0.97))
+    fig.tight_layout(rect=(0, 0, 1, 0.96))
     fig.savefig(out_path, dpi=120)
     plt.close(fig)
     return out_path
@@ -159,13 +164,13 @@ def render(adj_true, est, spikes, calcium, dt, title, out_path):
 
 def make_panel(run_dir, stage="EN+Dale", out=None):
     from calcium_ar.experiments.config import ExperimentConfig
-    from calcium_ar.data.dataset import SimulatedDataset
+    from calcium_ar.experiments.metrics import connectivity_metrics
 
     run_dir = Path(run_dir)
     config = ExperimentConfig.from_json(run_dir / "config.json")
-    # adj_inferred uses source=column; adj_true is stored source=row. Transpose to
-    # the estimated convention so every panel aligns (see metrics.py convention note).
-    adj_true = np.load(run_dir / "adj_true.npy").T
+    adj_raw = np.load(run_dir / "adj_true.npy")   # source=row; metrics transpose internally
+    adj = adj_raw.T                               # aligned to the estimate for the visuals
+
     mats = {
         "EN": run_dir / "adj_inferred.npy",
         "EN+Dale": run_dir / "adj_dale.npy",
@@ -176,18 +181,17 @@ def make_panel(run_dir, stage="EN+Dale", out=None):
         est_path, stage = mats["EN"], "EN"
     est = np.load(est_path)
 
-    ds = SimulatedDataset.load_or_generate(config, config.data_path)
-    spikes = np.asarray(ds.spikes)
-    calcium = np.asarray(ds.calcium)
+    m = connectivity_metrics._metrics
+    metrics = {k: float(m[k](est, adj_raw)) for k in REPORT}
 
     out = out or str(run_dir / f"panel_{stage.replace('+', '_')}.png")
-    title = f"{config.name}  [{stage}]  (N={adj_true.shape[0]}, tau={config.tau}, "
-    title += f"lag={config.lag_ms}ms, lam={config.lam})"
-    return render(adj_true, est, spikes, calcium, config.dt, title, out)
+    title = (f"{config.name}  [{stage}]   N={adj.shape[0]}, tau={config.tau}, "
+             f"lag={config.lag_ms} ms, lam={config.lam}")
+    return render(adj, est, metrics, title, out)
 
 
 if __name__ == "__main__":
-    p = argparse.ArgumentParser(description="7-panel diagnostic figure for one run")
+    p = argparse.ArgumentParser(description="compact diagnostic panel for one run")
     p.add_argument("run_dir")
     p.add_argument("--stage", default="EN+Dale",
                    choices=["EN", "EN+Dale", "EN+Dale+balance"])
