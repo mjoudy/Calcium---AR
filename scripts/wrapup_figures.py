@@ -132,8 +132,9 @@ def draw_ecdf(ax, pairs, density):
         pooled["E"].append(a[g > 0]); pooled["I"].append(a[g < 0])
         pooled["none"].append(a[g == 0])
         m = T.connected_mask_at_density(a_abs, density)
-        thr_vals.append(a_abs[m].min())     # smallest |w| still called connected
-    thr = float(np.mean(thr_vals))
+        if m.any():                          # guard: a collapsed (all-zero) method
+            thr_vals.append(a_abs[m].min())  # smallest |w| still called connected
+    thr = float(np.mean(thr_vals)) if thr_vals else 0.0
     allw = np.concatenate([a for A, adj in pairs
                            for a in [T._offdiag(A, adj)[1]]])
     lo, hi = np.percentile(allw, [1, 99])

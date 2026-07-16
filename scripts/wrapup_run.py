@@ -49,17 +49,21 @@ COMMON = dict(
     tau=100.0, amplitude=1.0, sigma_intra=0.01, sigma_extra=0.05,
     smooth_window_ms=3.1, tau_method="ransac",
     lag_ms=2.0,                 # deconvolved-feed landscape peak (~synaptic delay)
-    lam_l1=3e-3, lam_l2=1e-3,   # EN; pure Lasso uses lam_l1 with lam_l2=0
     n_iter=500,
 )
 
 # Per-net overrides. n100 reuses the existing small-net setup (few-synapse J_ex=10);
 # n1250 is the validated scale-up (1000E+250I, J_ex=0.8 from J_ex*C_E=80).
+#
+# lam is NOT shared: L1 strength must scale with the weight magnitude. At J_ex=10
+# (n100) lam_l1=3e-3 is fine; at J_ex=0.8 (n1250) the weights are ~12x weaker, so
+# the SAME lam soft-thresholds everything to zero. The validated n1250 sweet spot
+# is lam~1e-4 (the working ladder operating point).
 NETS = {
     "n100":  dict(n_excitatory=80,   n_inhibitory=20,  J_ex=10.0, sim_time=5000.0,
-                  n_threads=4,  name="wrapup_local"),
+                  n_threads=4,  lam_l1=3e-3, lam_l2=1e-3, name="wrapup_local"),
     "n1250": dict(n_excitatory=1000, n_inhibitory=250, J_ex=0.8,  sim_time=50000.0,
-                  n_threads=8,  name="wrapup_n1250"),
+                  n_threads=8,  lam_l1=1e-4, lam_l2=1e-4, name="wrapup_n1250"),
 }
 
 
