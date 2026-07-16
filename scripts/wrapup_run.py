@@ -45,7 +45,7 @@ from calcium_ar.solvers.dale_fista import dale_fista
 
 # --- Settings shared across nets (validated landscape) ----------------------- #
 COMMON = dict(
-    epsilon=0.1, g=5.0, eta=2.0, delay=1.5, dt=0.1,
+    epsilon=0.1, delay=1.5, dt=0.1,
     tau=100.0, amplitude=1.0, sigma_intra=0.01, sigma_extra=0.05,
     smooth_window_ms=3.1, tau_method="ransac",
     lag_ms=2.0,                 # deconvolved-feed landscape peak (~synaptic delay)
@@ -53,17 +53,24 @@ COMMON = dict(
 )
 
 # Per-net overrides. n100 reuses the existing small-net setup (few-synapse J_ex=10);
-# n1250 is the validated scale-up (1000E+250I, J_ex=0.8 from J_ex*C_E=80).
+# n1250 is the old baseline (g=5, eta=2 -> high rate ~42 Hz, regular); n1250ai is
+# the regime-scan winner: g=8, eta=1.0 -> clean asynchronous-irregular at a
+# realistic ~8 Hz (CV 0.80, synchrony 0.027). See scripts/regime_scan.py.
 #
-# lam is NOT shared: L1 strength must scale with the weight magnitude. At J_ex=10
-# (n100) lam_l1=3e-3 is fine; at J_ex=0.8 (n1250) the weights are ~12x weaker, so
-# the SAME lam soft-thresholds everything to zero. The validated n1250 sweet spot
-# is lam~1e-4 (the working ladder operating point).
+# g/eta are per-net (they define the dynamical regime). lam is per-net too: L1
+# strength must scale with weight magnitude -- at J_ex=10 (n100) lam_l1=3e-3 is
+# fine; at J_ex=0.8 it must drop to ~1e-4 or every regularized method collapses
+# to zero.
 NETS = {
-    "n100":  dict(n_excitatory=80,   n_inhibitory=20,  J_ex=10.0, sim_time=5000.0,
-                  n_threads=4,  lam_l1=3e-3, lam_l2=1e-3, name="wrapup_local"),
-    "n1250": dict(n_excitatory=1000, n_inhibitory=250, J_ex=0.8,  sim_time=50000.0,
-                  n_threads=8,  lam_l1=1e-4, lam_l2=1e-4, name="wrapup_n1250"),
+    "n100":    dict(n_excitatory=80,   n_inhibitory=20,  J_ex=10.0, g=5.0, eta=2.0,
+                    sim_time=5000.0,  n_threads=4, lam_l1=3e-3, lam_l2=1e-3,
+                    name="wrapup_local"),
+    "n1250":   dict(n_excitatory=1000, n_inhibitory=250, J_ex=0.8,  g=5.0, eta=2.0,
+                    sim_time=50000.0, n_threads=8, lam_l1=1e-4, lam_l2=1e-4,
+                    name="wrapup_n1250"),
+    "n1250ai": dict(n_excitatory=1000, n_inhibitory=250, J_ex=0.8,  g=8.0, eta=1.0,
+                    sim_time=50000.0, n_threads=8, lam_l1=1e-4, lam_l2=1e-4,
+                    name="wrapup_n1250ai"),
 }
 
 
