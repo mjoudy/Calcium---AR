@@ -313,6 +313,102 @@ def figure2(data, method_key="endale"):
     return out
 
 
+# --------------------------------------------------------------------------- #
+# Figure 3 - excitatory threshold trade-off                                   #
+# --------------------------------------------------------------------------- #
+# Inhibitory is already saturated (recall ~1.0 at any threshold), so the only
+# class the threshold actually moves is excitatory. This figure isolates it:
+# as you lower the excitatory (positive-side) threshold you recover more true E
+# (missed E / false negatives fall) but wrongly promote more none-edges to E
+# (false positives rise). Left panel shows that count trade-off directly; right
+# panel is the same thing as the excitatory precision-recall curve.
+
+def _exc_curves(pairs, grid_dens):
+    """Mean over seeds of TP/FP/FN counts and precision/recall for E-vs-rest,
+    as a function of predicted-excitatory density (positive-side threshold)."""
+    TP, FP, FN, PR, RC = [], [], [], [], []
+    for A, adj in pairs:
+        g, a, _ = _off(A, adj)
+        nE = int((g > 0).sum())
+        ntot = len(g)
+        order = np.argsort(a)[::-1]            # most positive first
+        isE = (g[order] > 0)
+        cumE = np.cumsum(isE)                  # true E among the top-k positives
+        ks = np.clip((grid_dens * ntot).astype(int), 1, ntot)
+        tp = cumE[ks - 1].astype(float)
+        fp = ks.astype(float) - tp
+        fn = nE - tp
+        TP.append(tp); FP.append(fp); FN.append(fn)
+        PR.append(tp / np.maximum(tp + fp, 1)); RC.append(tp / max(nE, 1))
+    return (np.mean(TP, 0), np.mean(FP, 0), np.mean(FN, 0),
+            np.mean(PR, 0), np.mean(RC, 0))
+
+
+def _exc_op_at_total(pairs, density):
+    """Excitatory operating point produced by the |w| density threshold used in
+    scoring: returns mean (predicted-E density, recall, precision)."""
+    pe, rc, pr = [], [], []
+    for A, adj in pairs:
+        g, a, a_abs = _off(A, adj)
+        conn = T.connected_mask_at_density(a_abs, density)
+        predE = conn & (a > 0)
+        nP = int(predE.sum()); tp = int((predE & (g > 0)).sum())
+        pe.append(nP / len(g))
+        rc.append(tp / max(int((g > 0).sum()), 1))
+        pr.append(tp / max(nP, 1))
+    return float(np.mean(pe)), float(np.mean(rc)), float(np.mean(pr))
+
+
+def _off(A, adj):
+    return T._offdiag(A, adj)
+
+
+def figure_excitatory(data, method_key="endale"):
+    label = dict((m[0], m[1]) for m in METHODS)[method_key]
+    pairs = data[method_key]
+    grid = np.linspace(0.003, 0.20, 120)
+    TP, FP, FN, PRc, RCc = _exc_curves(pairs, grid)
+    op_d, op_r, op_p = _exc_op_at_total(pairs, DENSITY)
+
+    C_FN, C_FP = "#2a78d6", "#eb6834"          # missed-E (blue), false-E (orange)
+    fig, (axL, axR) = plt.subplots(1, 2, figsize=(13, 5.2))
+    fig.subplots_adjust(left=0.07, right=0.97, top=0.86, bottom=0.13, wspace=0.28)
+
+    # Left: count trade-off vs predicted-E density
+    axL.plot(grid * 100, FN, color=C_FN, lw=2, label="missed true E  (false neg)")
+    axL.plot(grid * 100, FP, color=C_FP, lw=2, label="none called E  (false pos)")
+    axL.axvline(op_d * 100, color=MUTED, ls="--", lw=1)
+    axL.annotate(f"10% density\noperating point\n(E recall {op_r:.2f})",
+                 (op_d * 100, axL.get_ylim()[1]), textcoords="offset points",
+                 xytext=(6, -4), va="top", color=MUTED, fontsize=8.5)
+    axL.set(xlabel="predicted excitatory density (%)   →  looser threshold",
+            ylabel="edge count", title="excitatory error trade-off")
+    axL.legend(frameon=False, fontsize=9, loc="upper right")
+    axL.grid(True, color=GRID, lw=0.6); axL.set_axisbelow(True)
+
+    # Right: excitatory precision-recall curve
+    axR.plot(RCc, PRc, color="#2a78d6", lw=2)
+    axR.plot(op_r, op_p, "o", ms=10, color="#4a3aa7", mec="white", mew=1.2, zorder=5)
+    axR.annotate("10% density", (op_r, op_p), textcoords="offset points",
+                 xytext=(8, 6), color="#4a3aa7", fontweight="bold", fontsize=9)
+    axR.set(xlim=(0, 1), ylim=(0, 1.02), xlabel="excitatory recall",
+            ylabel="excitatory precision", title="excitatory precision-recall")
+    axR.grid(True, color=GRID, lw=0.6); axR.set_axisbelow(True)
+
+    for ax in (axL, axR):
+        for s in ("top", "right"):
+            ax.spines[s].set_visible(False)
+
+    N = pairs[0][0].shape[0]
+    fig.suptitle("Figure 3 - Excitatory threshold trade-off  "
+                 f"({label}, N={N}; inhibitory is already ~perfect)",
+                 fontsize=13, color=INK, x=0.07, ha="left")
+    out = DATA / f"excitatory_{method_key}.png"
+    fig.savefig(out, dpi=150, facecolor="white")
+    plt.close(fig)
+    return out
+
+
 def main():
     import argparse
     global DATA
@@ -330,8 +426,10 @@ def main():
     data, n_seeds = load()
     f1 = figure1(data, n_seeds)
     f2 = figure2(data, args.decision_method)
+    f3 = figure_excitatory(data, args.decision_method)
     print(f"wrote {f1}")
     print(f"wrote {f2}")
+    print(f"wrote {f3}")
     if args.decision_compare and args.decision_method != "ols":
         print(f"wrote {figure2(data, 'ols')}")
 
