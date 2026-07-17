@@ -1,0 +1,65 @@
+# GPU environment for the calcium-ar project — identical scientific stack to
+# environment.yml, plus a CUDA build of PyTorch for the GPU solvers / the
+# streaming GPU moment accumulation (scripts/wrapup_run_stream.py --device cuda,
+# used at N=12500 on NEMO2's l40s partition).
+#
+# This is a SEPARATE env on purpose: it leaves the validated CPU env (phd_conda)
+# untouched, and gives anyone a one-command, reproducible GPU setup.
+#
+# Create it (use a prefix so the SLURM scripts find it at $WS/env-gpu):
+#     conda env create -f environment-gpu.yml -p $(ws_find calcium_ar)/env-gpu
+#     # (mamba is faster: mamba env create ...)
+#
+# Verify CUDA — must run ON a GPU node (e.g. inside an l40s job / salloc):
+#     $(ws_find calcium_ar)/env-gpu/bin/python -c "import torch; print(torch.cuda.is_available(), torch.cuda.get_device_name(0))"
+#
+# NOTE on the CUDA build: the PyTorch wheel bundles its own CUDA runtime, so the
+# cluster's CUDA modules don't matter — only the NVIDIA driver must be recent
+# enough (L40S nodes are, they're 2025 hardware). cu124 is a safe default for
+# torch 2.12.0; if pip can't find that exact combo, pick another build listed at
+# https://download.pytorch.org/whl/torch/ (e.g. cu121 / cu126) and keep the torch
+# version matched to the CPU env (2.12.0) so numerics stay identical.
+
+name: phd_conda_gpu
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.12.7
+  - pip
+
+  # --- simulation engine (conda-forge only; not on PyPI) ---
+  - nest-simulator=3.8
+  - openmpi=5.0.5
+
+  # --- numerical core ---
+  - numpy=2.1.2
+  - scipy=1.14.1
+  - scikit-learn=1.5.2
+
+  # --- IO / storage ---
+  - h5py=3.11.0
+  - zarr=2.18.3
+  - numcodecs=0.14.0
+
+  # --- experiment records ---
+  - pandas=2.2.3
+  - joblib=1.4.2
+
+  # --- HPC parallelism ---
+  - dask=2024.9.1
+  - dask-jobqueue=0.9.0
+
+  # --- analysis / graph ---
+  - networkx=3.2.1
+  - statsmodels=0.14.4
+  - python-louvain=0.15
+
+  # --- plotting ---
+  - matplotlib-base=3.9.2
+  - seaborn=0.13.2
+
+  # --- CUDA PyTorch (the only difference from environment.yml) ---
+  - pip:
+    - --index-url https://download.pytorch.org/whl/cu124
+    - torch==2.12.0
