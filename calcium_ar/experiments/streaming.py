@@ -65,6 +65,52 @@ class MomentAccumulator:
         return Cxx, Cyx
 
 
+class TorchMomentAccumulator:
+    """GPU version of MomentAccumulator. The heavy lag-pair matmuls run on the
+    device in float32 (fast on L40S); the reductions accumulate in float64 for
+    stability across many chunks. snapshot() returns numpy float64 moments (moved
+    to CPU) so the one-off OLS/Ridge solve can be done exactly on the CPU.
+
+    Same interface as MomentAccumulator, so stream_moments() is device-agnostic."""
+
+    def __init__(self, N: int, lag: int, device: str = "cuda"):
+        import torch
+        self.torch = torch
+        self.N, self.lag, self.device = N, lag, device
+        self.Cxx_raw = torch.zeros(N, N, dtype=torch.float64, device=device)
+        self.Cyx_raw = torch.zeros(N, N, dtype=torch.float64, device=device)
+        self.s_prev = torch.zeros(N, dtype=torch.float64, device=device)
+        self.s_now = torch.zeros(N, dtype=torch.float64, device=device)
+        self.n = 0
+        self.tail = torch.zeros(N, 0, dtype=torch.float32, device=device)
+
+    def add(self, feed_chunk: np.ndarray) -> None:
+        t = self.torch
+        fc = t.as_tensor(feed_chunk, dtype=t.float32, device=self.device)
+        buf = t.cat([self.tail, fc], dim=1)
+        if buf.shape[1] <= self.lag:
+            self.tail = buf
+            return
+        xp = buf[:, :-self.lag]
+        xn = buf[:, self.lag:]
+        self.Cxx_raw += (xp @ xp.T).double()
+        self.Cyx_raw += (xn @ xp.T).double()
+        self.s_prev += xp.sum(1).double()
+        self.s_now += xn.sum(1).double()
+        self.n += xp.shape[1]
+        self.tail = buf[:, -self.lag:].clone()
+
+    def snapshot(self) -> tuple[np.ndarray, np.ndarray]:
+        if self.n == 0:
+            raise RuntimeError("no pairs accumulated yet")
+        t = self.torch
+        mu_p = self.s_prev / self.n
+        mu_n = self.s_now / self.n
+        Cxx = (self.Cxx_raw - self.n * t.outer(mu_p, mu_p)) / self.n
+        Cyx = (self.Cyx_raw - self.n * t.outer(mu_n, mu_p)) / self.n
+        return Cxx.cpu().numpy(), Cyx.cpu().numpy()
+
+
 def stream_moments(
     net,
     *,
@@ -79,6 +125,7 @@ def stream_moments(
     checkpoints_samples: list[int],
     chunk_samples: int = 100_000,
     seed: int = 1,
+    device: str | None = None,
 ):
     """Stream calcium -> feed in chunks from a *run* BrunelNetwork (densify=False)
     and accumulate moments, snapshotting at each checkpoint (in samples).
@@ -96,7 +143,8 @@ def stream_moments(
     zi = np.zeros((N, 1))
     rng = np.random.default_rng(seed)
 
-    acc = MomentAccumulator(N, lag)
+    acc = (TorchMomentAccumulator(N, lag, device=device) if device
+           else MomentAccumulator(N, lag))
     checkpoints = sorted(checkpoints_samples)
     results: dict[int, tuple[np.ndarray, np.ndarray]] = {}
     ci = 0

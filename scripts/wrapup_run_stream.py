@@ -34,17 +34,33 @@ from calcium_ar.solvers.from_moments import (
 
 from wrapup_run import build_cfg, NETS       # reuse the net presets
 
+ALL_METHODS = ["ols", "ridge", "en", "lasso", "lassodale", "endale"]
 
-def solve_all(Cxx, Cyx, cfg):
-    A_ols = ols_from_moments(Cxx, Cyx)
-    A_en = fista_from_moments(Cxx, Cyx, cfg["lam_l1"], cfg["lam_l2"], cfg["n_iter"])
-    A_lasso = fista_from_moments(Cxx, Cyx, cfg["lam_l1"], 0.0, cfg["n_iter"])
-    A_endale = dale_from_moments(Cxx, Cyx, strongest_entry_types(A_en),
-                                 cfg["lam_l1"], cfg["lam_l2"], cfg["n_iter"] + 300)
-    A_lassodale = dale_from_moments(Cxx, Cyx, strongest_entry_types(A_lasso),
-                                    cfg["lam_l1"], 0.0, cfg["n_iter"] + 300)
-    return dict(ols=A_ols, en=A_en, lasso=A_lasso,
-                lassodale=A_lassodale, endale=A_endale)
+
+def solve_selected(Cxx, Cyx, cfg, methods):
+    """Solve only the requested methods (OLS/Ridge are one closed-form solve each;
+    en/lasso/dale are the iterative FISTA ones — skip them at very large N)."""
+    out = {}
+    if "ols" in methods:
+        out["ols"] = ols_from_moments(Cxx, Cyx)
+    if "ridge" in methods:
+        out["ridge"] = ols_from_moments(Cxx, Cyx, ridge=cfg["lam_l2"])
+    A_en = None
+    if "en" in methods or "endale" in methods:
+        A_en = fista_from_moments(Cxx, Cyx, cfg["lam_l1"], cfg["lam_l2"], cfg["n_iter"])
+        if "en" in methods:
+            out["en"] = A_en
+    if "lasso" in methods or "lassodale" in methods:
+        A_lasso = fista_from_moments(Cxx, Cyx, cfg["lam_l1"], 0.0, cfg["n_iter"])
+        if "lasso" in methods:
+            out["lasso"] = A_lasso
+        if "lassodale" in methods:
+            out["lassodale"] = dale_from_moments(Cxx, Cyx, strongest_entry_types(A_lasso),
+                                                 cfg["lam_l1"], 0.0, cfg["n_iter"] + 300)
+    if "endale" in methods:
+        out["endale"] = dale_from_moments(Cxx, Cyx, strongest_entry_types(A_en),
+                                          cfg["lam_l1"], cfg["lam_l2"], cfg["n_iter"] + 300)
+    return out
 
 
 def main():
@@ -54,6 +70,10 @@ def main():
                     help="recording lengths in ms (e.g. 500000 1000000 2000000)")
     ap.add_argument("--seeds", type=int, nargs="+", default=[1, 2, 3])
     ap.add_argument("--chunk-ms", type=float, default=10000.0)
+    ap.add_argument("--device", default=None,
+                    help="None=CPU/numpy; 'cuda'=GPU accumulation (for large N)")
+    ap.add_argument("--methods", nargs="+", default=ALL_METHODS, choices=ALL_METHODS,
+                    help="which estimators to solve (use 'ols ridge' at N=12500)")
     ap.add_argument("--out-root", default=None)
     args = ap.parse_args()
 
@@ -85,19 +105,21 @@ def main():
             net, dt=dt, lag=lag, tau=cfg["tau"], amplitude=cfg["amplitude"],
             sigma_intra=cfg["sigma_intra"], sigma_extra=cfg["sigma_extra"],
             smooth_win=smooth_win, tau_method=cfg["tau_method"],
-            checkpoints_samples=checkpoints, chunk_samples=chunk_samples, seed=seed)
+            checkpoints_samples=checkpoints, chunk_samples=chunk_samples, seed=seed,
+            device=args.device)
         print(f"[seed {seed}] mean rate {rate:.1f} Hz", flush=True)
 
         for T, cp in zip(args.sweep, checkpoints):
             Cxx, Cyx = moments[cp]
-            mats = solve_all(Cxx, Cyx, cfg)
+            mats = solve_selected(Cxx, Cyx, cfg, args.methods)
             outdir = Path(base) / "results" / f"{cfg['name']}_T{int(T)//1000}k" / f"seed{seed}"
             outdir.mkdir(parents=True, exist_ok=True)
             np.save(outdir / "adj_true.npy", adj_true)
             for name, A in mats.items():
                 np.save(outdir / f"A_{name}.npy", A)
+            k0 = next(iter(mats))
             print(f"[seed {seed}] T={T:.0f}ms done -> {outdir}  "
-                  f"nz(lasso)={int((mats['lasso'] != 0).sum())}", flush=True)
+                  f"|{k0}|max={np.abs(mats[k0]).max():.2e}", flush=True)
 
     print("\nsweep complete")
 

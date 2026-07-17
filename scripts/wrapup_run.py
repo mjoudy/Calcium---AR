@@ -71,6 +71,11 @@ NETS = {
     "n1250ai": dict(n_excitatory=1000, n_inhibitory=250, J_ex=0.8,  g=8.0, eta=1.0,
                     sim_time=50000.0, n_threads=8, lam_l1=1e-4, lam_l2=1e-4,
                     name="wrapup_n1250ai"),
+    # Full Brunel scale in the clean-AI regime. J fluctuation-scaled from n1250ai:
+    # J*sqrt(C_E) const, C_E 100 -> 1250, so J = 0.8*sqrt(100/1250) ~ 0.23.
+    "n12500ai": dict(n_excitatory=10000, n_inhibitory=2500, J_ex=0.23, g=8.0, eta=1.0,
+                     sim_time=1_000_000.0, n_threads=16, lam_l1=1e-4, lam_l2=1e-4,
+                     name="wrapup_n12500ai"),
 }
 
 
