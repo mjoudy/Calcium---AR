@@ -15,10 +15,12 @@
 #
 # NOTE on the CUDA build: the PyTorch wheel bundles its own CUDA runtime, so the
 # cluster's CUDA modules don't matter — only the NVIDIA driver must be recent
-# enough (L40S nodes are, they're 2025 hardware). cu124 is a safe default for
-# torch 2.12.0; if pip can't find that exact combo, pick another build listed at
-# https://download.pytorch.org/whl/torch/ (e.g. cu121 / cu126) and keep the torch
-# version matched to the CPU env (2.12.0) so numerics stay identical.
+# enough (L40S nodes are, they're 2025 hardware). We pin torch 2.6.0 (the newest
+# build on the cu124 index; the CPU env's 2.12.0 is not published for CUDA). Our
+# GPU code only uses basic tensor ops (matmul, outer, sum, .double()), which are
+# numerically identical across torch versions, so the version gap is irrelevant.
+# If cu124 ever fails, pick another build at
+# https://download.pytorch.org/whl/torch/ (e.g. cu121 / cu126).
 
 name: phd_conda_gpu
 channels:
@@ -62,4 +64,4 @@ dependencies:
   # --- CUDA PyTorch (the only difference from environment.yml) ---
   - pip:
     - --index-url https://download.pytorch.org/whl/cu124
-    - torch==2.12.0
+    - torch==2.6.0
