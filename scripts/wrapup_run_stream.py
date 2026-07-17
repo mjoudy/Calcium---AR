@@ -1,0 +1,106 @@
+"""
+Streaming data-length sweep: simulate ONE long recording per seed and infer
+connectivity at several recording lengths, to test whether more data recovers
+inference in the clean-AI regime (n1250ai) where correlations are weak.
+
+Memory stays O(N^2): spikes are read sparsely, calcium/feed are built in
+time-chunks, and the lag-pair moments (Cxx, Cyx) are accumulated incrementally
+and snapshotted at each checkpoint. All five methods derive from those moments.
+
+Outputs, per (T, seed), under results/<name>_T<Tms>k/seed<k>/:
+    adj_true.npy, A_ols.npy, A_en.npy, A_lasso.npy, A_lassodale.npy, A_endale.npy
+
+Usage:
+  python scripts/wrapup_run_stream.py --net n1250ai --sweep 500000 1000000 2000000 --seeds 1 2 3
+  python scripts/wrapup_run_stream.py --net n1250ai --sweep 20000 50000 --seeds 1   # local check
+"""
+
+from __future__ import annotations
+
+import argparse
+import os
+import sys
+from pathlib import Path
+
+import numpy as np
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+
+from calcium_ar.simulation.brunel_network import BrunelNetwork
+from calcium_ar.experiments.streaming import stream_moments
+from calcium_ar.solvers.from_moments import (
+    ols_from_moments, fista_from_moments, dale_from_moments, strongest_entry_types)
+
+from wrapup_run import build_cfg, NETS       # reuse the net presets
+
+
+def solve_all(Cxx, Cyx, cfg):
+    A_ols = ols_from_moments(Cxx, Cyx)
+    A_en = fista_from_moments(Cxx, Cyx, cfg["lam_l1"], cfg["lam_l2"], cfg["n_iter"])
+    A_lasso = fista_from_moments(Cxx, Cyx, cfg["lam_l1"], 0.0, cfg["n_iter"])
+    A_endale = dale_from_moments(Cxx, Cyx, strongest_entry_types(A_en),
+                                 cfg["lam_l1"], cfg["lam_l2"], cfg["n_iter"] + 300)
+    A_lassodale = dale_from_moments(Cxx, Cyx, strongest_entry_types(A_lasso),
+                                    cfg["lam_l1"], 0.0, cfg["n_iter"] + 300)
+    return dict(ols=A_ols, en=A_en, lasso=A_lasso,
+                lassodale=A_lassodale, endale=A_endale)
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--net", default="n1250ai", choices=list(NETS))
+    ap.add_argument("--sweep", type=float, nargs="+", required=True,
+                    help="recording lengths in ms (e.g. 500000 1000000 2000000)")
+    ap.add_argument("--seeds", type=int, nargs="+", default=[1, 2, 3])
+    ap.add_argument("--chunk-ms", type=float, default=10000.0)
+    ap.add_argument("--out-root", default=None)
+    args = ap.parse_args()
+
+    cfg = build_cfg(args.net)
+    dt = cfg["dt"]
+    lag = max(1, round(cfg["lag_ms"] / dt))
+    w = max(5, round(cfg["smooth_window_ms"] / dt))
+    smooth_win = w if w % 2 == 1 else w + 1
+    max_T = max(args.sweep)
+    checkpoints = [int(round(T / dt)) for T in args.sweep]
+    chunk_samples = int(round(args.chunk_ms / dt))
+
+    base = args.out_root or os.environ.get("CALCIUM_AR_WORKDIR") or str(ROOT)
+    print(f"net={args.net} g={cfg['g']} eta={cfg['eta']}  sweep(ms)={args.sweep}  "
+          f"seeds={args.seeds}  chunk_ms={args.chunk_ms}", flush=True)
+
+    for seed in args.seeds:
+        print(f"[seed {seed}] simulating {max_T:.0f} ms (densify=False) ...", flush=True)
+        net = BrunelNetwork(
+            n_excitatory=cfg["n_excitatory"], n_inhibitory=cfg["n_inhibitory"],
+            epsilon=cfg["epsilon"], g=cfg["g"], eta=cfg["eta"], J_ex=cfg["J_ex"],
+            delay=cfg["delay"], sim_time=max_T, dt=dt,
+            n_threads=cfg["n_threads"], seed=seed)
+        net.build(); net.run(densify=False)
+        adj_true = net.get_adjacency(); np.fill_diagonal(adj_true, 0.0)
+
+        print(f"[seed {seed}] streaming moments + checkpoints ...", flush=True)
+        moments, tau_est, rate = stream_moments(
+            net, dt=dt, lag=lag, tau=cfg["tau"], amplitude=cfg["amplitude"],
+            sigma_intra=cfg["sigma_intra"], sigma_extra=cfg["sigma_extra"],
+            smooth_win=smooth_win, tau_method=cfg["tau_method"],
+            checkpoints_samples=checkpoints, chunk_samples=chunk_samples, seed=seed)
+        print(f"[seed {seed}] mean rate {rate:.1f} Hz", flush=True)
+
+        for T, cp in zip(args.sweep, checkpoints):
+            Cxx, Cyx = moments[cp]
+            mats = solve_all(Cxx, Cyx, cfg)
+            outdir = Path(base) / "results" / f"{cfg['name']}_T{int(T)//1000}k" / f"seed{seed}"
+            outdir.mkdir(parents=True, exist_ok=True)
+            np.save(outdir / "adj_true.npy", adj_true)
+            for name, A in mats.items():
+                np.save(outdir / f"A_{name}.npy", A)
+            print(f"[seed {seed}] T={T:.0f}ms done -> {outdir}  "
+                  f"nz(lasso)={int((mats['lasso'] != 0).sum())}", flush=True)
+
+    print("\nsweep complete")
+
+
+if __name__ == "__main__":
+    main()

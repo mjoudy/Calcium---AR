@@ -180,15 +180,46 @@ class BrunelNetwork:
         self._recorder = nest.Create("spike_recorder")
         nest.Connect(self._all_nodes, self._recorder)
 
-    def run(self) -> None:
-        """Run the simulation."""
+    def run(self, densify: bool = True) -> None:
+        """Run the simulation.
+
+        densify=True (default) builds the dense (N, T) spike matrix. For very
+        long recordings set densify=False and read spikes sparsely via
+        get_spike_events() — the dense matrix would not fit in RAM."""
         import nest
 
         t0 = time.time()
         nest.Simulate(self.sim_time)
         elapsed = time.time() - t0
         print(f"Simulation finished in {elapsed:.1f}s")
-        self._extract_results()
+        if densify:
+            self._extract_results()
+
+    def get_spike_events(self) -> tuple[np.ndarray, np.ndarray]:
+        """Return spikes as sparse events (no dense (N, T) array).
+
+        Returns (neuron_index, spike_time_ms): neuron_index is 0-based in
+        [0, N), spike_time_ms is the event time in ms."""
+        import nest
+        ev = nest.GetStatus(self._recorder, "events")[0]
+        senders = np.asarray(ev["senders"], dtype=np.int64)
+        times = np.asarray(ev["times"], dtype=float)
+        base = int(self._all_nodes.tolist()[0])          # first neuron GID
+        idx = senders - base
+        return idx, times
+
+    def get_adjacency(self) -> np.ndarray:
+        """Ground-truth (N, N) connectivity, without densifying spikes.
+        adj[s, t] = synaptic weight from source s to target t (0-indexed)."""
+        import nest
+        conn = nest.GetConnections(source=self._all_nodes, target=self._all_nodes)
+        base = int(self._all_nodes.tolist()[0])
+        sources = np.array(nest.GetStatus(conn, "source")) - base
+        targets = np.array(nest.GetStatus(conn, "target")) - base
+        weights = np.array(nest.GetStatus(conn, "weight"))
+        adj = np.zeros((self.N, self.N))
+        adj[sources, targets] = weights
+        return adj
 
     def _extract_results(self) -> None:
         import nest
