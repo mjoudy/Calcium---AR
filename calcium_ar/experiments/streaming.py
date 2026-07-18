@@ -138,9 +138,23 @@ def stream_moments(
     checkpoint_samples -> (Cxx, Cyx)."""
     N = net.N
     T_total = int(round(net.sim_time / dt))
+    # Spike events dominate RAM at high firing rates: a 5e6 ms recording of 12500
+    # neurons at ~60 Hz is ~3.7e9 events, which at int64+float64+int64 is ~90 GB
+    # (this OOM'd a 120 GB node). Store the index as int16 (N < 32767) and the
+    # time as an int32 SAMPLE number, and drop the float64 times -> ~6 bytes/event.
+    # Then sort by time once so each chunk can be located with searchsorted,
+    # instead of scanning every event with a boolean mask per chunk (which was
+    # O(n_events * n_chunks) and the main reason streaming crawled).
     idx, times = net.get_spike_events()
-    times_samp = np.round(times / dt).astype(np.int64)
-    mean_rate = len(times) / (N * net.sim_time / 1000.0)
+    n_events = len(times)
+    mean_rate = n_events / (N * net.sim_time / 1000.0)
+    times_samp = np.round(times / dt).astype(np.int32)
+    del times
+    idx = idx.astype(np.int16) if N <= 32767 else idx.astype(np.int32)
+    order = np.argsort(times_samp, kind="stable")
+    times_samp = times_samp[order]
+    idx = idx[order]
+    del order
 
     # float32 throughout the chunk pipeline: ~2x less memory traffic and
     # noticeably faster noise/AR at large N, with no measurable effect on the
@@ -180,10 +194,14 @@ def stream_moments(
     while t0 < T_total:
         t1 = min(t0 + chunk_samples, T_total)
         L = t1 - t0
-        # sparse -> dense spikes for this chunk only
+        # sparse -> dense spikes for this chunk only (events are time-sorted, so
+        # the chunk's events are a contiguous slice — no full-array scan)
         spk = np.zeros((N, L), dtype=np.float32)
-        m = (times_samp >= t0) & (times_samp < t1)
-        np.add.at(spk, (idx[m], times_samp[m] - t0), f32(1.0))
+        lo = np.searchsorted(times_samp, t0, side="left")
+        hi = np.searchsorted(times_samp, t1, side="left")
+        if hi > lo:
+            np.add.at(spk, (idx[lo:hi].astype(np.intp),
+                            (times_samp[lo:hi] - t0).astype(np.intp)), f32(1.0))
         # calcium via AR(1) lfilter, carrying state zi across chunks
         # (standard_normal(dtype=f32)*sigma is markedly faster than normal(0,sigma))
         inp = spk

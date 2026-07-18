@@ -19,7 +19,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
-#SBATCH --mem=120G
+#SBATCH --mem=240G
 #SBATCH --time=12:00:00
 #SBATCH --output=slurm_logs/n12500_lowrate_%j.log
 #
