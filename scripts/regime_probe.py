@@ -43,6 +43,7 @@ CONFIGS_BY_SCALE = {
     "n12500": [
         ("brunel_AI_fig8B",      dict(J_ex=0.1,  g=6.0, eta=4.0, V_reset=10.0)),
         ("brunel_SI_fig8C",      dict(J_ex=0.1,  g=5.0, eta=2.0, V_reset=10.0)),
+        ("brunel_AI_lowrate",    dict(J_ex=0.1,  g=6.0, eta=1.5, V_reset=10.0)),
         ("ours_n12500ai",        dict(J_ex=0.23, g=8.0, eta=1.0, V_reset=0.0)),
         ("ours_params_Vr10",     dict(J_ex=0.23, g=8.0, eta=1.0, V_reset=10.0)),
     ],

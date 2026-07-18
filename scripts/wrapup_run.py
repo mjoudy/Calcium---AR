@@ -86,6 +86,13 @@ NETS = {
     "n12500": dict(n_excitatory=10000, n_inhibitory=2500, J_ex=0.1, g=6.0, eta=4.0,
                    V_reset=10.0, sim_time=1_000_000.0, n_threads=16,
                    lam_l1=1e-4, lam_l2=1e-4, name="wrapup_n12500"),
+    # Same canonical parameters, but eta lowered to put the AI state at a
+    # cortical-like rate. Balance gives nu ~ 20*(eta-1), so eta=1.5 -> ~10 Hz
+    # (Fig 8B's eta=4 gives ~60 Hz). g/J/V_r/delay all stay canonical.
+    "n12500_lowrate": dict(n_excitatory=10000, n_inhibitory=2500, J_ex=0.1,
+                           g=6.0, eta=1.5, V_reset=10.0, sim_time=1_000_000.0,
+                           n_threads=16, lam_l1=1e-4, lam_l2=1e-4,
+                           name="wrapup_n12500lr"),
 }
 
 
