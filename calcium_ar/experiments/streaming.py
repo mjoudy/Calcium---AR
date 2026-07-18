@@ -141,10 +141,15 @@ def stream_moments(
     times_samp = np.round(times / dt).astype(np.int64)
     mean_rate = len(times) / (N * net.sim_time / 1000.0)
 
+    # float32 throughout the chunk pipeline: ~2x less memory traffic and
+    # noticeably faster noise/AR at large N, with no measurable effect on the
+    # downstream metrics (the moments are reduced in float64).
     alpha = float(np.exp(-dt / tau))
-    b, a = [1.0], [1.0, -alpha]
-    zi = np.zeros((N, 1))
+    b = np.array([1.0], dtype=np.float32)
+    a = np.array([1.0, -alpha], dtype=np.float32)
+    zi = np.zeros((N, 1), dtype=np.float32)
     rng = np.random.default_rng(seed)
+    f32 = np.float32
 
     acc = (TorchMomentAccumulator(N, lag, device=device) if device
            else MomentAccumulator(N, lag))
@@ -175,13 +180,18 @@ def stream_moments(
         t1 = min(t0 + chunk_samples, T_total)
         L = t1 - t0
         # sparse -> dense spikes for this chunk only
-        spk = np.zeros((N, L))
+        spk = np.zeros((N, L), dtype=np.float32)
         m = (times_samp >= t0) & (times_samp < t1)
-        np.add.at(spk, (idx[m], times_samp[m] - t0), 1.0)
+        np.add.at(spk, (idx[m], times_samp[m] - t0), f32(1.0))
         # calcium via AR(1) lfilter, carrying state zi across chunks
-        inp = amplitude * spk + rng.normal(0.0, sigma_intra, (N, L))
+        # (standard_normal(dtype=f32)*sigma is markedly faster than normal(0,sigma))
+        inp = spk
+        inp *= f32(amplitude)
+        inp += rng.standard_normal((N, L), dtype=np.float32) * f32(sigma_intra)
         C, zi = lfilter(b, a, inp, axis=1, zi=zi)
-        F = C + rng.normal(0.0, sigma_extra, (N, L))          # fluorescence
+        del inp
+        F = C
+        F += rng.standard_normal((N, L), dtype=np.float32) * f32(sigma_extra)  # fluorescence
         if tau_est is None:
             tau_est = estimate_tau_robust(F, window_length=smooth_win,
                                           method=tau_method, dt=dt)

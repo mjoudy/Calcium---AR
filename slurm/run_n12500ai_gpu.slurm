@@ -20,13 +20,12 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=120G
-#SBATCH --time=03:00:00
+#SBATCH --time=08:00:00
 #SBATCH --output=slurm_logs/n12500ai_gpu_%j.log
 #
-# PROBE first (1 seed, 1M ms) to measure real cost now that deconvolution is on
-# the GPU. Read the log for the per-checkpoint time, then scale up by editing the
-# --sweep / --seeds line below, e.g.:
-#   --sweep 1000000 2000000 5000000 --seeds 1 2   (and bump --time accordingly)
+# Measured: the 1M-ms probe took 1h14m before the float32 speedup. The 5M sweep
+# is ~5x that work, minus ~1.5-2x from float32 => expect roughly 3-4 h; the 8 h
+# wall leaves margin. Scoring runs on the cluster, so only metrics.csv comes home.
 
 set -eo pipefail
 
@@ -47,9 +46,17 @@ assert torch.cuda.is_available(), "No CUDA torch — set GPU_PY to a CUDA env, o
 print("gpu:", torch.cuda.get_device_name(0))
 PYCHK
 
-# PROBE: 1 seed, 1M ms only, OLS+Ridge, GPU accumulation. Measure the cost, then
-# scale up (e.g. --sweep 1000000 2000000 5000000 --seeds 1 2  and bump --time).
+# A2 — recovery curve at full scale: ONE 5M-ms simulation per seed, scored at the
+# 1M / 2M / 5M checkpoints. 1 seed (seeds at this scale are deferred to a revision).
 "$PY" scripts/wrapup_run_stream.py --net n12500ai \
-      --sweep 1000000 --seeds 1 \
+      --sweep 1000000 2000000 5000000 --seeds 1 \
       --methods ols ridge --device cuda --chunk-ms 5000
+
+# Score ON THE CLUSTER — only the small metrics.csv needs to travel home.
+for Tk in 1000 2000 5000; do
+    "$PY" scripts/analyze_run.py --data "$WS/results/wrapup_n12500ai_T${Tk}k" \
+        || echo "analyze T${Tk}k failed (continuing)"
+done
 echo "done: $(date)"
+echo "--- copy home just these: ---"
+ls -lh "$WS"/results/wrapup_n12500ai_T*k/metrics.csv 2>/dev/null

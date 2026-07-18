@@ -114,9 +114,11 @@ def main():
             mats = solve_selected(Cxx, Cyx, cfg, args.methods)
             outdir = Path(base) / "results" / f"{cfg['name']}_T{int(T)//1000}k" / f"seed{seed}"
             outdir.mkdir(parents=True, exist_ok=True)
-            np.save(outdir / "adj_true.npy", adj_true)
+            # float32 on disk: halves file size (1.25 GB -> 0.6 GB at N=12500)
+            # with no meaningful precision loss for connectivity analysis.
+            np.save(outdir / "adj_true.npy", adj_true.astype(np.float32))
             for name, A in mats.items():
-                np.save(outdir / f"A_{name}.npy", A)
+                np.save(outdir / f"A_{name}.npy", A.astype(np.float32))
             k0 = next(iter(mats))
             print(f"[seed {seed}] T={T:.0f}ms done -> {outdir}  "
                   f"|{k0}|max={np.abs(mats[k0]).max():.2e}", flush=True)
