@@ -79,6 +79,8 @@ class BrunelNetwork:
         delay: float = 1.5,
         tau_m: float = 20.0,
         V_th: float = 20.0,
+        V_reset: float = 0.0,   # Brunel 2000 uses 10.0; 0.0 kept as the default
+                                # so every existing result stays reproducible.
         sim_time: float = 1000.0,
         dt: float = 0.1,
         n_threads: int = 1,
@@ -95,6 +97,7 @@ class BrunelNetwork:
         self.delay = delay
         self.tau_m = tau_m
         self.V_th = V_th
+        self.V_reset = V_reset
         self.sim_time = sim_time
         self.dt = dt
         self.n_threads = n_threads
@@ -126,7 +129,7 @@ class BrunelNetwork:
             "t_ref": 2.0,
             "V_m": 0.0,
             "V_th": self.V_th,
-            "V_reset": 0.0,
+            "V_reset": self.V_reset,
             "E_L": 0.0,
             "C_m": 1.0,
         }
