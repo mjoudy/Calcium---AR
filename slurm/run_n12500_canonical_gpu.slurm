@@ -51,8 +51,10 @@ PYCHK
 # Cheap (short sim), and it lands in the log before the expensive part starts, so
 # a bad regime can be caught early.
 echo "=== regime preflight: canonical Brunel at N=12500 ==="
+mkdir -p "$WS/results/network_state"
 "$PY" scripts/regime_probe.py --scale n12500 --only brunel_canonical \
-      --sim-time 5000 --n-threads "${SLURM_CPUS_PER_TASK}" || true
+      --sim-time 5000 --n-threads "${SLURM_CPUS_PER_TASK}" \
+      --fig "$WS/results/network_state/n12500_canonical.png" || true
 
 # A2 — recovery curve at full scale, CANONICAL Brunel 2000 parameters
 # (J=0.1, g=5, eta=2, V_reset=10 mV at N=12500 — no rescaling needed at this size).
@@ -69,4 +71,4 @@ for Tk in 1000 2000 5000; do
 done
 echo "done: $(date)"
 echo "--- copy home just these: ---"
-ls -lh "$WS"/results/wrapup_n12500_T*k/metrics.csv 2>/dev/null
+ls -lh "$WS"/results/wrapup_n12500_T*k/metrics.csv "$WS"/results/network_state/*.png 2>/dev/null

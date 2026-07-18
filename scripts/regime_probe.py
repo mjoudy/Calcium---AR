@@ -55,7 +55,8 @@ CONFIGS_BY_SCALE = {
 }
 
 
-def probe(cfg, n_exc, n_inh, sim_time, dt, warmup_ms, n_threads, seed=1):
+def probe(cfg, n_exc, n_inh, sim_time, dt, warmup_ms, n_threads, seed=1,
+          collect_fig=False, window_ms=1000.0, n_show=200):
     net = BrunelNetwork(n_excitatory=n_exc, n_inhibitory=n_inh, epsilon=0.1,
                         g=cfg["g"], eta=cfg["eta"], J_ex=cfg["J_ex"],
                         V_reset=cfg["V_reset"], delay=1.5,
@@ -67,9 +68,83 @@ def probe(cfg, n_exc, n_inh, sim_time, dt, warmup_ms, n_threads, seed=1):
     rates = spk.sum(1) / (spk.shape[1] * dt / 1000.0)
     cv = np.asarray(calculate_cv(spk))
     cv_mean = float(np.nanmean(cv[rates > 0])) if (rates > 0).any() else float("nan")
-    return dict(rate_E=float(rates[:n_exc].mean()), rate_I=float(rates[n_exc:].mean()),
-                rate=float(rates.mean()), cv=cv_mean,
-                sync=synchrony_index(spk, dt), silent=float((rates == 0).mean()))
+    stats = dict(rate_E=float(rates[:n_exc].mean()), rate_I=float(rates[n_exc:].mean()),
+                 rate=float(rates.mean()), cv=cv_mean,
+                 sync=synchrony_index(spk, dt), silent=float((rates == 0).mean()))
+
+    payload = None
+    if collect_fig:
+        # keep only small slices for plotting, then free the big spike matrix
+        win = min(int(round(window_ms / dt)), spk.shape[1])
+        nE_show = int(round(n_show * n_exc / (n_exc + n_inh)))
+        nI_show = n_show - nE_show
+        rows = np.r_[np.arange(nE_show), np.arange(n_exc, n_exc + nI_show)]
+        raster = np.asarray(spk[rows][:, :win] > 0)
+        pop = spk[:, :win].sum(0)                      # (win,) — cheap
+        b = max(1, int(round(5.0 / dt)))               # 5 ms bins
+        nb = win // b
+        pr = pop[:nb * b].reshape(nb, b).sum(1) / ((n_exc + n_inh) * b * dt / 1000.0)
+        step = max(1, spk.shape[0] // 300)             # ISI from ~300 neurons
+        isis = []
+        for n in range(0, spk.shape[0], step):
+            ts = np.flatnonzero(spk[n]) * dt
+            if len(ts) > 1:
+                isis.append(np.diff(ts))
+        payload = dict(raster=raster, nE_show=nE_show, pr=pr, dt=dt,
+                       window_ms=win * dt,
+                       isis=np.concatenate(isis) if isis else np.array([1.0]))
+    del spikes, spk
+    return stats, payload
+
+
+def make_figure(results, out_path, N):
+    """One column per probed config: raster, population rate, ISI + stats."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    INK, MUTED, GRID = "#0b0b0b", "#52514e", "#e1e0d9"
+    C_E, C_I = "#2a78d6", "#e34948"
+
+    n = len(results)
+    fig, axes = plt.subplots(3, n, figsize=(6.5 * n, 10), squeeze=False,
+                             gridspec_kw=dict(height_ratios=[1.4, 0.9, 0.9]))
+    fig.subplots_adjust(left=0.07, right=0.97, top=0.9, bottom=0.08,
+                        hspace=0.45, wspace=0.22)
+    for c, (name, cfg, st, pl) in enumerate(results):
+        ax = axes[0][c]
+        r, nE = pl["raster"], pl["nE_show"]
+        for row in range(r.shape[0]):
+            ts = np.flatnonzero(r[row]) * pl["dt"]
+            ax.plot(ts, np.full(ts.shape, row), "|",
+                    color=C_E if row < nE else C_I, ms=3.5, mew=0.7)
+        ax.set(xlim=(0, pl["window_ms"]), ylim=(-1, r.shape[0]),
+               xlabel="time (ms)", ylabel="neuron",
+               title=f"{name}\nJ={cfg['J_ex']}, g={cfg['g']:g}, eta={cfg['eta']:g}, "
+                     f"V_r={cfg['V_reset']:g}")
+        ax.set_yticks([])
+
+        ax = axes[1][c]
+        ax.plot(np.arange(len(pl["pr"])) * 5.0, pl["pr"], color="#4a3aa7", lw=1.2)
+        ax.set(xlim=(0, pl["window_ms"]), xlabel="time (ms)", ylabel="pop. rate (Hz)")
+        ax.grid(True, color=GRID, lw=0.6); ax.set_axisbelow(True)
+
+        ax = axes[2][c]
+        isis = pl["isis"]
+        ax.hist(isis, bins=np.linspace(0, np.percentile(isis, 99), 60),
+                color="#1baf7a", alpha=0.85, density=True)
+        ax.set(xlabel="ISI (ms)", ylabel="density")
+        ax.grid(True, color=GRID, lw=0.6); ax.set_axisbelow(True)
+        ax.text(0.97, 0.95,
+                f"rate: E {st['rate_E']:.1f} Hz  I {st['rate_I']:.1f} Hz\n"
+                f"mean {st['rate']:.1f} Hz\nCV(ISI) {st['cv']:.2f}\n"
+                f"synchrony {st['sync']:.3f}\nsilent {100*st['silent']:.0f}%",
+                transform=ax.transAxes, ha="right", va="top", fontsize=9, color=INK,
+                bbox=dict(boxstyle="round", fc="white", ec="#4a3aa7", lw=1.2))
+
+    fig.suptitle(f"Network state, N={N}", fontsize=14, color=INK, x=0.07, ha="left")
+    fig.savefig(out_path, dpi=140, facecolor="white")
+    plt.close(fig)
+    print(f"wrote {out_path}")
 
 
 def main():
@@ -83,6 +158,10 @@ def main():
     ap.add_argument("--n-threads", type=int, default=8)
     ap.add_argument("--only", nargs="+", default=None,
                     help="run only these named configs (e.g. brunel_canonical)")
+    ap.add_argument("--fig", default=None,
+                    help="save a network-state panel (raster / pop rate / ISI) here")
+    ap.add_argument("--window-ms", type=float, default=1000.0,
+                    help="time window shown in the raster and rate panels")
     args = ap.parse_args()
 
     defaults = {"n12500": (10000, 2500), "n1250": (1000, 250)}[args.scale]
@@ -99,14 +178,20 @@ def main():
     print(f"{'config':22s} {'J':>6} {'g':>4} {'eta':>5} {'V_r':>5} | "
           f"{'rate':>6} {'rateE':>6} {'rateI':>6} {'CV':>5} {'sync':>6} {'silent':>6}")
     print("-" * 96)
+    results = []
     for name, cfg in CONFIGS:
-        r = probe(cfg, args.n_exc, args.n_inh, args.sim_time, args.dt,
-                  args.warmup_ms, args.n_threads)
+        r, pl = probe(cfg, args.n_exc, args.n_inh, args.sim_time, args.dt,
+                      args.warmup_ms, args.n_threads,
+                      collect_fig=bool(args.fig), window_ms=args.window_ms)
         print(f"{name:22s} {cfg['J_ex']:6.2f} {cfg['g']:4.0f} {cfg['eta']:5.1f} "
               f"{cfg['V_reset']:5.1f} | {r['rate']:6.1f} {r['rate_E']:6.1f} "
               f"{r['rate_I']:6.1f} {r['cv']:5.2f} {r['sync']:6.3f} {r['silent']:6.2f}",
               flush=True)
+        if pl is not None:
+            results.append((name, cfg, r, pl))
     print("\nAI target: rate ~5-15 Hz, CV ~0.8-1.0, sync ~0")
+    if args.fig and results:
+        make_figure(results, args.fig, args.n_exc + args.n_inh)
 
 
 if __name__ == "__main__":
