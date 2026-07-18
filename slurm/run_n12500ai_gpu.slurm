@@ -47,8 +47,9 @@ assert torch.cuda.is_available(), "No CUDA torch — set GPU_PY to a CUDA env, o
 print("gpu:", torch.cuda.get_device_name(0))
 PYCHK
 
-# 2 seeds x {1M,2M,5M} ms, OLS+Ridge only, GPU accumulation
+# PROBE: 1 seed, 1M ms only, OLS+Ridge, GPU accumulation. Measure the cost, then
+# scale up (e.g. --sweep 1000000 2000000 5000000 --seeds 1 2  and bump --time).
 "$PY" scripts/wrapup_run_stream.py --net n12500ai \
-      --sweep 1000000 2000000 5000000 --seeds 1 2 \
+      --sweep 1000000 --seeds 1 \
       --methods ols ridge --device cuda --chunk-ms 5000
 echo "done: $(date)"
