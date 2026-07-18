@@ -95,7 +95,8 @@ def main():
         net = BrunelNetwork(
             n_excitatory=cfg["n_excitatory"], n_inhibitory=cfg["n_inhibitory"],
             epsilon=cfg["epsilon"], g=cfg["g"], eta=cfg["eta"], J_ex=cfg["J_ex"],
-            delay=cfg["delay"], sim_time=max_T, dt=dt,
+            delay=cfg["delay"], V_reset=cfg["V_reset"],
+            sim_time=max_T, dt=dt,
             n_threads=cfg["n_threads"], seed=seed)
         net.build(); net.run(densify=False)
         adj_true = net.get_adjacency(); np.fill_diagonal(adj_true, 0.0)

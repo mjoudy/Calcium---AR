@@ -11,9 +11,9 @@
 #   --device (numpy path) on the cpu partition at a smaller T (e.g. 1M ms, ~1 h).
 #
 # Submit:  cd $(ws_find calcium_ar)/Calcium---AR
-#          sbatch slurm/run_n12500ai_gpu.slurm
+#          sbatch slurm/run_n12500_canonical_gpu.slurm
 
-#SBATCH --job-name=ca_n12500ai_gpu
+#SBATCH --job-name=ca_n12500_canon
 #SBATCH --partition=l40s
 #SBATCH --gres=gpu:1
 #SBATCH --nodes=1
@@ -21,7 +21,7 @@
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=120G
 #SBATCH --time=12:00:00
-#SBATCH --output=slurm_logs/n12500ai_gpu_%j.log
+#SBATCH --output=slurm_logs/n12500_canon_%j.log
 #
 # Measured: the 1M-ms probe took 1h14m. The 5M sweep is ~5x that work, and the
 # observed pace suggests ~6-8 h, so the wall is 12 h. Checkpoints are solved and
@@ -47,17 +47,26 @@ assert torch.cuda.is_available(), "No CUDA torch — set GPU_PY to a CUDA env, o
 print("gpu:", torch.cuda.get_device_name(0))
 PYCHK
 
-# A2 — recovery curve at full scale: ONE 5M-ms simulation per seed, scored at the
-# 1M / 2M / 5M checkpoints. 1 seed (seeds at this scale are deferred to a revision).
-"$PY" scripts/wrapup_run_stream.py --net n12500ai \
+# --- preflight: what regime does the CANONICAL config actually produce here? ---
+# Cheap (short sim), and it lands in the log before the expensive part starts, so
+# a bad regime can be caught early.
+echo "=== regime preflight: canonical Brunel at N=12500 ==="
+"$PY" scripts/regime_probe.py --scale n12500 --only brunel_canonical \
+      --sim-time 5000 --n-threads "${SLURM_CPUS_PER_TASK}" || true
+
+# A2 — recovery curve at full scale, CANONICAL Brunel 2000 parameters
+# (J=0.1, g=5, eta=2, V_reset=10 mV at N=12500 — no rescaling needed at this size).
+# ONE 5M-ms simulation per seed, scored at the 1M / 2M / 5M checkpoints, each
+# solved and SAVED as it is reached. 1 seed (seeds deferred to a revision).
+"$PY" scripts/wrapup_run_stream.py --net n12500 \
       --sweep 1000000 2000000 5000000 --seeds 1 \
       --methods ols ridge --device cuda --chunk-ms 5000
 
 # Score ON THE CLUSTER — only the small metrics.csv needs to travel home.
 for Tk in 1000 2000 5000; do
-    "$PY" scripts/analyze_run.py --data "$WS/results/wrapup_n12500ai_T${Tk}k" \
+    "$PY" scripts/analyze_run.py --data "$WS/results/wrapup_n12500_T${Tk}k" \
         || echo "analyze T${Tk}k failed (continuing)"
 done
 echo "done: $(date)"
 echo "--- copy home just these: ---"
-ls -lh "$WS"/results/wrapup_n12500ai_T*k/metrics.csv 2>/dev/null
+ls -lh "$WS"/results/wrapup_n12500_T*k/metrics.csv 2>/dev/null

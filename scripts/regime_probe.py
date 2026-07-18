@@ -31,7 +31,7 @@ from calcium_ar.simulation.brunel_network import BrunelNetwork
 from calcium_ar.preprocessing.signal_utils import calculate_cv
 from scripts.regime_scan import synchrony_index
 
-# Brunel 2000 canonical: N_E=10000, N_I=2500, eps=0.1 (C_E=1250), J=0.1 mV,
+# Brunel 2000 canonical: N_E=10000, N_I=2500, eps=0.1 (C_E=1000), J=0.1 mV,
 # delay 1.5 ms, tau_m 20, theta 20, V_r 10, t_ref 2.
 #
 # Two scales:
@@ -81,12 +81,18 @@ def main():
     ap.add_argument("--warmup-ms", type=float, default=1000.0)
     ap.add_argument("--dt", type=float, default=0.1)
     ap.add_argument("--n-threads", type=int, default=8)
+    ap.add_argument("--only", nargs="+", default=None,
+                    help="run only these named configs (e.g. brunel_canonical)")
     args = ap.parse_args()
 
     defaults = {"n12500": (10000, 2500), "n1250": (1000, 250)}[args.scale]
     args.n_exc = args.n_exc or defaults[0]
     args.n_inh = args.n_inh or defaults[1]
     CONFIGS = CONFIGS_BY_SCALE[args.scale]
+    if args.only:
+        CONFIGS = [c for c in CONFIGS if c[0] in set(args.only)]
+        if not CONFIGS:
+            raise SystemExit(f"no config matched {args.only}")
 
     print(f"scale={args.scale}  N={args.n_exc + args.n_inh}  "
           f"(C_E={int(0.1*args.n_exc)})  sim_time={args.sim_time:.0f} ms\n")

@@ -45,7 +45,7 @@ from calcium_ar.solvers.dale_fista import dale_fista
 
 # --- Settings shared across nets (validated landscape) ----------------------- #
 COMMON = dict(
-    epsilon=0.1, delay=1.5, dt=0.1,
+    epsilon=0.1, delay=1.5, dt=0.1, V_reset=0.0,
     tau=100.0, amplitude=1.0, sigma_intra=0.01, sigma_extra=0.05,
     smooth_window_ms=3.1, tau_method="ransac",
     lag_ms=2.0,                 # deconvolved-feed landscape peak (~synaptic delay)
@@ -71,11 +71,18 @@ NETS = {
     "n1250ai": dict(n_excitatory=1000, n_inhibitory=250, J_ex=0.8,  g=8.0, eta=1.0,
                     sim_time=50000.0, n_threads=8, lam_l1=1e-4, lam_l2=1e-4,
                     name="wrapup_n1250ai"),
-    # Full Brunel scale in the clean-AI regime. J fluctuation-scaled from n1250ai:
-    # J*sqrt(C_E) const, C_E 100 -> 1250, so J = 0.8*sqrt(100/1250) ~ 0.23.
+    # Full Brunel scale, our tuned variant (J fluctuation-scaled from n1250ai,
+    # V_reset=0). Kept for reproducibility of the runs already done.
     "n12500ai": dict(n_excitatory=10000, n_inhibitory=2500, J_ex=0.23, g=8.0, eta=1.0,
-                     sim_time=1_000_000.0, n_threads=16, lam_l1=1e-4, lam_l2=1e-4,
-                     name="wrapup_n12500ai"),
+                     V_reset=0.0, sim_time=1_000_000.0, n_threads=16,
+                     lam_l1=1e-4, lam_l2=1e-4, name="wrapup_n12500ai"),
+    # CANONICAL Brunel 2000 at its native size — no rescaling needed here, which
+    # is why "canonical" is only strictly meaningful at N=12500:
+    #   N_E=10000, N_I=2500, eps=0.1 (C_E=1000), J=0.1 mV, g=5, eta=2,
+    #   delay=1.5, tau_m=20, theta=20, V_r=10, t_ref=2.
+    "n12500": dict(n_excitatory=10000, n_inhibitory=2500, J_ex=0.1, g=5.0, eta=2.0,
+                   V_reset=10.0, sim_time=1_000_000.0, n_threads=16,
+                   lam_l1=1e-4, lam_l2=1e-4, name="wrapup_n12500"),
 }
 
 
@@ -102,7 +109,8 @@ def make_feed(seed: int, cfg: dict) -> tuple[np.ndarray, np.ndarray]:
     net = BrunelNetwork(
         n_excitatory=cfg["n_excitatory"], n_inhibitory=cfg["n_inhibitory"],
         epsilon=cfg["epsilon"], g=cfg["g"], eta=cfg["eta"], J_ex=cfg["J_ex"],
-        delay=cfg["delay"], sim_time=cfg["sim_time"], dt=dt,
+        delay=cfg["delay"], V_reset=cfg["V_reset"],
+        sim_time=cfg["sim_time"], dt=dt,
         n_threads=cfg["n_threads"], seed=seed,
     )
     net.build(); net.run()
