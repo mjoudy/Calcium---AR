@@ -20,8 +20,13 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=120G
-#SBATCH --time=12:00:00
+#SBATCH --time=03:00:00
 #SBATCH --output=slurm_logs/n12500ai_gpu_%j.log
+#
+# PROBE first (1 seed, 1M ms) to measure real cost now that deconvolution is on
+# the GPU. Read the log for the per-checkpoint time, then scale up by editing the
+# --sweep / --seeds line below, e.g.:
+#   --sweep 1000000 2000000 5000000 --seeds 1 2   (and bump --time accordingly)
 
 set -eo pipefail
 

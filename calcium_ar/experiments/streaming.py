@@ -84,9 +84,12 @@ class TorchMomentAccumulator:
         self.n = 0
         self.tail = torch.zeros(N, 0, dtype=torch.float32, device=device)
 
-    def add(self, feed_chunk: np.ndarray) -> None:
+    def add(self, feed_chunk) -> None:
         t = self.torch
-        fc = t.as_tensor(feed_chunk, dtype=t.float32, device=self.device)
+        if isinstance(feed_chunk, t.Tensor):          # already deconvolved on device
+            fc = feed_chunk.to(dtype=t.float32)
+        else:
+            fc = t.as_tensor(feed_chunk, dtype=t.float32, device=self.device)
         buf = t.cat([self.tail, fc], dim=1)
         if buf.shape[1] <= self.lag:
             self.tail = buf
@@ -145,6 +148,23 @@ def stream_moments(
 
     acc = (TorchMomentAccumulator(N, lag, device=device) if device
            else MomentAccumulator(N, lag))
+
+    # GPU deconvolution: Savitzky-Golay smoothing/derivative are fixed
+    # convolutions, so on the device we run them as conv1d (matches scipy on
+    # interior points to machine precision). Kernels depend only on the window;
+    # tau enters when it is estimated on the first chunk. This removes the
+    # CPU-side deconvolution bottleneck that dominates at large N.
+    if device:
+        import torch
+        from torch.nn.functional import conv1d, pad as _pad
+        from scipy.signal import savgol_coeffs
+        _half = smooth_win // 2
+        _ks = torch.tensor(savgol_coeffs(smooth_win, 3, deriv=0, delta=dt, use="dot"),
+                           dtype=torch.float32, device=device).reshape(1, 1, smooth_win)
+        _kd = torch.tensor(savgol_coeffs(smooth_win, 3, deriv=1, delta=dt, use="dot"),
+                           dtype=torch.float32, device=device).reshape(1, 1, smooth_win)
+        _tau_t = None
+
     checkpoints = sorted(checkpoints_samples)
     results: dict[int, tuple[np.ndarray, np.ndarray]] = {}
     ci = 0
@@ -165,11 +185,21 @@ def stream_moments(
         if tau_est is None:
             tau_est = estimate_tau_robust(F, window_length=smooth_win,
                                           method=tau_method, dt=dt)
-        # deconvolve chunk -> feed (per-chunk savgol; boundary error negligible
-        # for large chunks)
-        smooth = smooth_signal(F, window_length=smooth_win, deriv=0, delta=dt)
-        deriv = smooth_signal(F, window_length=smooth_win, deriv=1, delta=dt)
-        acc.add(reconstruct_feed(smooth, deriv, tau_est))
+        # deconvolve chunk -> feed (per-chunk; boundary error negligible for
+        # large chunks). GPU: conv1d on device; CPU: scipy savgol.
+        if device:
+            if _tau_t is None:
+                _tau_t = torch.as_tensor(np.atleast_1d(tau_est), dtype=torch.float32,
+                                         device=device).reshape(-1, 1)
+            Ft = torch.as_tensor(F, dtype=torch.float32, device=device).unsqueeze(1)
+            Ft = _pad(Ft, (_half, _half), mode="replicate")   # edge-safe padding
+            sm = conv1d(Ft, _ks).squeeze(1)
+            dv = conv1d(Ft, _kd).squeeze(1)
+            acc.add(dv + sm / _tau_t)
+        else:
+            smooth = smooth_signal(F, window_length=smooth_win, deriv=0, delta=dt)
+            deriv = smooth_signal(F, window_length=smooth_win, deriv=1, delta=dt)
+            acc.add(reconstruct_feed(smooth, deriv, tau_est))
         t0 = t1
         while ci < len(checkpoints) and t1 >= checkpoints[ci]:
             results[checkpoints[ci]] = acc.snapshot()
