@@ -78,9 +78,12 @@ NETS = {
                      lam_l1=1e-4, lam_l2=1e-4, name="wrapup_n12500ai"),
     # CANONICAL Brunel 2000 at its native size — no rescaling needed here, which
     # is why "canonical" is only strictly meaningful at N=12500:
-    #   N_E=10000, N_I=2500, eps=0.1 (C_E=1000), J=0.1 mV, g=5, eta=2,
+    #   N_E=10000, N_I=2500, eps=0.1 (C_E=1000), J=0.1 mV,
     #   delay=1.5, tau_m=20, theta=20, V_r=10, t_ref=2.
-    "n12500": dict(n_excitatory=10000, n_inhibitory=2500, J_ex=0.1, g=5.0, eta=2.0,
+    # (g, eta) = (6, 4) is Brunel Fig 8B — the ASYNCHRONOUS IRREGULAR state.
+    # NOTE: (5, 2) is Fig 8C = synchronous irregular, which is what we measured
+    # as CV 0.43 — regular-ish, not AI. Use 8B for AI.
+    "n12500": dict(n_excitatory=10000, n_inhibitory=2500, J_ex=0.1, g=6.0, eta=4.0,
                    V_reset=10.0, sim_time=1_000_000.0, n_threads=16,
                    lam_l1=1e-4, lam_l2=1e-4, name="wrapup_n12500"),
 }

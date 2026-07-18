@@ -52,9 +52,9 @@ PYCHK
 # a bad regime can be caught early.
 echo "=== regime preflight: canonical Brunel at N=12500 ==="
 mkdir -p "$WS/results/network_state"
-"$PY" scripts/regime_probe.py --scale n12500 --only brunel_canonical \
+"$PY" scripts/regime_probe.py --scale n12500 --only brunel_AI_fig8B \
       --sim-time 5000 --n-threads "${SLURM_CPUS_PER_TASK}" \
-      --fig "$WS/results/network_state/n12500_canonical.png" || true
+      --fig "$WS/results/network_state/n12500_AI.png" || true
 
 # A2 — recovery curve at full scale, CANONICAL Brunel 2000 parameters
 # (J=0.1, g=5, eta=2, V_reset=10 mV at N=12500 — no rescaling needed at this size).
