@@ -1,5 +1,48 @@
 # Brunel Network Configuration Reference
 
+> **VERIFIED 2026-07-18 — measured on this codebase at N=12500. Do not re-derive
+> or re-search these; they are simulation results, not recollection.**
+>
+> ### Which (g, eta) is which regime — Brunel 2000 Fig 8
+> | Fig | g | eta | regime | measured here (N=12500, J=0.1, V_r=10) |
+> |-----|---|-----|--------|-----------------------------------------|
+> | 8B | **6** | **4** | **asynchronous irregular (AI)** | rate 58.7 Hz, CV 0.86, sync 0.010 |
+> | 8C | 5 | 2 | synchronous irregular (SI, fast) | rate 37.4 Hz, CV 0.43, sync 0.017 |
+> | —  | 6 | 1.5 | AI at a cortical rate (eta lowered) | rate 13.7 Hz, CV 0.62, sync 0.008 |
+>
+> **g=5, eta=2 is NOT the AI point.** It is Fig 8C. That is the default in the
+> widely-copied NEST `brunel_delta_nest.py` example, which is why it gets
+> mislabelled as "the Brunel network". The AI state is **Fig 8B: g=6, eta=4**.
+>
+> ### Firing rate is set by eta (balance argument)
+> mean input = eta*theta + J*tau*nu*(C_E - g*C_I). Setting it at threshold:
+> * g=6, J=0.1, C_E=1000:  **nu ~ 20*(eta - 1)**  -> eta=4 gives ~60 Hz, eta=1.5 gives ~10 Hz.
+> * Lower rate also means smaller fluctuations (sigma ~ J*sqrt(C_E*nu*tau)), so CV
+>   drops as you lower eta: 0.86 @ 59 Hz -> 0.62 @ 13.7 Hz. Rate and irregularity
+>   cannot be maximised independently at fixed g.
+>
+> ### V_reset matters and was wrong in this codebase until 2026-07-18
+> `BrunelNetwork` hardcoded **V_reset = 0**; Brunel uses **V_r = 10 mV** (as this
+> document already stated). V_r=0 suppresses irregularity — measured at N=1250,
+> g=5/eta=2: CV **0.58** at V_r=0 vs **1.67** at V_r=10. It shifts the whole phase
+> diagram. `V_reset` is now a parameter (default 0.0 to keep old results
+> reproducible); canonical presets set 10.0.
+>
+> ### "Canonical" only applies at N=12500
+> Brunel's parameters are defined at N_E=10000, N_I=2500, eps=0.1 -> **C_E=1000**,
+> J=0.1 mV. Downscaling forces a J-rescaling choice (mean- vs fluctuation-
+> preserving) and no choice preserves every property, so smaller nets are
+> *variants*, not canonical.
+>
+> ### Presets (scripts/wrapup_run.py)
+> * `n12500` — canonical Fig 8B AI (g=6, eta=4, V_r=10)
+> * `n12500_lowrate` — same but eta=1.5 (~14 Hz, cortical rate)
+> * `n12500ai` — deprecated early variant (J=0.23, g=8, eta=1, V_r=0)
+>
+> Check any config cheaply with:
+> `python scripts/regime_probe.py --scale n12500 --only brunel_AI_fig8B --sim-time 5000 --fig out.png`
+
+
 ## The Canonical Brunel 2000 AI State
 
 Parameters from Brunel (2000) "Dynamics of Sparsely Connected Networks of Excitatory and Inhibitory Spiking Neurons":
