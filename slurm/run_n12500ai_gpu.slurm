@@ -20,12 +20,13 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=120G
-#SBATCH --time=08:00:00
+#SBATCH --time=12:00:00
 #SBATCH --output=slurm_logs/n12500ai_gpu_%j.log
 #
-# Measured: the 1M-ms probe took 1h14m before the float32 speedup. The 5M sweep
-# is ~5x that work, minus ~1.5-2x from float32 => expect roughly 3-4 h; the 8 h
-# wall leaves margin. Scoring runs on the cluster, so only metrics.csv comes home.
+# Measured: the 1M-ms probe took 1h14m. The 5M sweep is ~5x that work, and the
+# observed pace suggests ~6-8 h, so the wall is 12 h. Checkpoints are solved and
+# SAVED as soon as they are reached, so even a timeout leaves the shorter
+# recording lengths on disk. Scoring runs on the cluster (metrics.csv only).
 
 set -eo pipefail
 

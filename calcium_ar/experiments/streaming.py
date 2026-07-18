@@ -129,6 +129,7 @@ def stream_moments(
     chunk_samples: int = 100_000,
     seed: int = 1,
     device: str | None = None,
+    on_checkpoint=None,
 ):
     """Stream calcium -> feed in chunks from a *run* BrunelNetwork (densify=False)
     and accumulate moments, snapshotting at each checkpoint (in samples).
@@ -212,11 +213,21 @@ def stream_moments(
             acc.add(reconstruct_feed(smooth, deriv, tau_est))
         t0 = t1
         while ci < len(checkpoints) and t1 >= checkpoints[ci]:
-            results[checkpoints[ci]] = acc.snapshot()
+            Cxx_cp, Cyx_cp = acc.snapshot()
+            if on_checkpoint is not None:
+                # solve + persist immediately, so a wall-clock timeout later
+                # still leaves the earlier checkpoints on disk
+                on_checkpoint(checkpoints[ci], Cxx_cp, Cyx_cp)
+            else:
+                results[checkpoints[ci]] = (Cxx_cp, Cyx_cp)
             ci += 1
 
     # snapshot at full length for any checkpoints beyond T_total
     while ci < len(checkpoints):
-        results[checkpoints[ci]] = acc.snapshot()
+        Cxx_cp, Cyx_cp = acc.snapshot()
+        if on_checkpoint is not None:
+            on_checkpoint(checkpoints[ci], Cxx_cp, Cyx_cp)
+        else:
+            results[checkpoints[ci]] = (Cxx_cp, Cyx_cp)
         ci += 1
     return results, tau_est, mean_rate

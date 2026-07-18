@@ -101,27 +101,30 @@ def main():
         adj_true = net.get_adjacency(); np.fill_diagonal(adj_true, 0.0)
 
         print(f"[seed {seed}] streaming moments + checkpoints ...", flush=True)
+
+        cp_to_T = {int(round(T / dt)): T for T in args.sweep}
+
+        def save_checkpoint(cp, Cxx, Cyx, _seed=seed, _adj=adj_true):
+            """Solve + persist as soon as a checkpoint is reached, so a wall-clock
+            timeout still leaves the earlier recording lengths on disk."""
+            T = cp_to_T[cp]
+            mats = solve_selected(Cxx, Cyx, cfg, args.methods)
+            outdir = Path(base) / "results" / f"{cfg['name']}_T{int(T)//1000}k" / f"seed{_seed}"
+            outdir.mkdir(parents=True, exist_ok=True)
+            np.save(outdir / "adj_true.npy", _adj.astype(np.float32))
+            for name, A in mats.items():
+                np.save(outdir / f"A_{name}.npy", A.astype(np.float32))
+            k0 = next(iter(mats))
+            print(f"[seed {_seed}] T={T:.0f}ms SAVED -> {outdir}  "
+                  f"|{k0}|max={np.abs(mats[k0]).max():.2e}", flush=True)
+
         moments, tau_est, rate = stream_moments(
             net, dt=dt, lag=lag, tau=cfg["tau"], amplitude=cfg["amplitude"],
             sigma_intra=cfg["sigma_intra"], sigma_extra=cfg["sigma_extra"],
             smooth_win=smooth_win, tau_method=cfg["tau_method"],
             checkpoints_samples=checkpoints, chunk_samples=chunk_samples, seed=seed,
-            device=args.device)
-        print(f"[seed {seed}] mean rate {rate:.1f} Hz", flush=True)
-
-        for T, cp in zip(args.sweep, checkpoints):
-            Cxx, Cyx = moments[cp]
-            mats = solve_selected(Cxx, Cyx, cfg, args.methods)
-            outdir = Path(base) / "results" / f"{cfg['name']}_T{int(T)//1000}k" / f"seed{seed}"
-            outdir.mkdir(parents=True, exist_ok=True)
-            # float32 on disk: halves file size (1.25 GB -> 0.6 GB at N=12500)
-            # with no meaningful precision loss for connectivity analysis.
-            np.save(outdir / "adj_true.npy", adj_true.astype(np.float32))
-            for name, A in mats.items():
-                np.save(outdir / f"A_{name}.npy", A.astype(np.float32))
-            k0 = next(iter(mats))
-            print(f"[seed {seed}] T={T:.0f}ms done -> {outdir}  "
-                  f"|{k0}|max={np.abs(mats[k0]).max():.2e}", flush=True)
+            device=args.device, on_checkpoint=save_checkpoint)
+        print(f"[seed {seed}] mean rate {rate:.1f} Hz  (all checkpoints saved)", flush=True)
 
     print("\nsweep complete")
 
