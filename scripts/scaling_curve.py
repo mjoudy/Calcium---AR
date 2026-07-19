@@ -27,18 +27,15 @@ import matplotlib.pyplot as plt
 
 DT = 0.1  # ms per sample
 
-# (label, N, colour, [(recording_ms, roc_auc, E_recall), ...])
-SERIES = [
-    ("N=12500 canonical, eta=4 (59 Hz)", 12500, "#2a78d6", [
-        (1_000_000, 0.8758, 0.4946),
-        (2_000_000, 0.9337, 0.6331),
-        (5_000_000, 0.9723, 0.7664),
-    ]),
-    ("N=12500 canonical, eta=1.5 (14 Hz)", 12500, "#1baf7a", [
-        (1_000_000, 0.8131, 0.3848),
-        (2_000_000, 0.8860, 0.5208),
-        (5_000_000, 0.9506, 0.6859),
-    ]),
+METRICS_DIR = Path("/home/mjoudy/calcium_results/hpc_metrics")
+
+# N=12500 series are READ FROM the cluster-written metrics.csv files (prefix ->
+# label/colour). N=1250 stays inline: its sweep predates the on-cluster scorer.
+CSV_SERIES = [
+    ("wrapup_n12500_T",   "N=12500 canonical, eta=4 (59 Hz)",   12500, "#2a78d6"),
+    ("wrapup_n12500lr_T", "N=12500 canonical, eta=1.5 (14 Hz)", 12500, "#1baf7a"),
+]
+INLINE_SERIES = [
     ("N=1250 (8 Hz)", 1250, "#4a3aa7", [
         (50_000, 0.725, 0.300),
         (500_000, 0.961, 0.733),
@@ -46,6 +43,30 @@ SERIES = [
         (2_000_000, 0.993, 0.885),
     ]),
 ]
+
+
+def load_series(method="ols"):
+    """Read (recording_ms, roc_auc, E_rec) per series from metrics.csv files."""
+    import csv as _csv
+    out = []
+    for prefix, label, N, colour in CSV_SERIES:
+        pts = []
+        for d in sorted(METRICS_DIR.glob(f"{prefix}*k")):
+            f = d / "metrics.csv"
+            if not f.exists():
+                continue
+            T_ms = float(d.name.rsplit("_T", 1)[1].rstrip("k")) * 1000.0
+            with open(f) as fh:
+                for row in _csv.DictReader(fh):
+                    if row["method"] == method:
+                        pts.append((T_ms, float(row["roc_auc"]), float(row["E_rec"])))
+                        break
+        if pts:
+            out.append((label, N, colour, sorted(pts)))
+        else:
+            print(f"[warn] no CSVs for {prefix}* under {METRICS_DIR}")
+    out.extend(INLINE_SERIES)
+    return out
 
 INK, MUTED, GRID = "#0b0b0b", "#52514e", "#e1e0d9"
 
@@ -60,7 +81,7 @@ def main():
     fig, (a1, a2) = plt.subplots(1, 2, figsize=(13.5, 5.4))
     fig.subplots_adjust(left=0.07, right=0.98, top=0.85, bottom=0.14, wspace=0.24)
 
-    for label, N, c, pts in SERIES:
+    for label, N, c, pts in load_series():
         T_ms = np.array([p[0] for p in pts], dtype=float)
         auc = np.array([p[1] for p in pts], dtype=float)
         erec = np.array([p[2] for p in pts], dtype=float)
