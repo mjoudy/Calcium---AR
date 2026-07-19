@@ -18,6 +18,8 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
 import os
 import sys
 from pathlib import Path
@@ -102,13 +104,32 @@ def main():
 
     for seed in args.seeds:
         # --- ground truth: reuse the cached simulation when we already have it ---
-        tag = f"{args.net}_seed{seed}_T{int(max_T)//1000}k"
+        # The key is a hash of EVERY parameter that determines the simulation, not
+        # just the preset name: editing a preset in place must not silently reuse
+        # a stale ground truth. The full spec is also stored inside the npz and
+        # re-checked on load, so a hash collision or hand-edited file still fails
+        # loudly rather than corrupting the science.
+        sim_spec = dict(
+            n_excitatory=cfg["n_excitatory"], n_inhibitory=cfg["n_inhibitory"],
+            epsilon=cfg["epsilon"], g=cfg["g"], eta=cfg["eta"], J_ex=cfg["J_ex"],
+            delay=cfg["delay"], V_reset=cfg["V_reset"], dt=dt,
+            sim_time=max_T, seed=seed, n_threads=cfg["n_threads"],
+        )
+        spec_str = json.dumps(sim_spec, sort_keys=True)
+        spec_hash = hashlib.sha1(spec_str.encode()).hexdigest()[:10]
+        tag = f"{args.net}_seed{seed}_T{int(max_T)//1000}k_{spec_hash}"
         cf = (cache / f"{tag}.npz") if cache else None
         net = None
         if cf is not None and cf.exists():
+            z = np.load(cf, allow_pickle=False)
+            cached_spec = str(z["sim_spec"])
+            if cached_spec != spec_str:
+                raise SystemExit(
+                    f"cache {cf.name} does not match the current config.\n"
+                    f"  cached:  {cached_spec}\n  current: {spec_str}\n"
+                    f"Delete it or use a different --cache-dir.")
             print(f"[seed {seed}] loading cached ground truth {cf.name} "
-                  f"(skipping NEST)", flush=True)
-            z = np.load(cf)
+                  f"(skipping NEST; config verified)", flush=True)
             spikes_cached = (z["idx"], z["times_ms"])
             adj_true = z["adj_true"].astype(np.float64)
         else:
@@ -125,9 +146,11 @@ def main():
             spikes_cached = net.get_spike_events()
             if cf is not None:
                 idx_c, t_c = spikes_cached
-                np.savez(cf, idx=idx_c.astype(np.int16), times_ms=t_c.astype(np.float32),
-                         adj_true=adj_true.astype(np.float32))
-                print(f"[seed {seed}] cached ground truth -> {cf}", flush=True)
+                np.savez(cf, idx=idx_c.astype(np.int16),
+                         times_ms=t_c.astype(np.float32),
+                         adj_true=adj_true.astype(np.float32),
+                         sim_spec=np.array(spec_str))
+                print(f"[seed {seed}] cached ground truth -> {cf.name}", flush=True)
         np.fill_diagonal(adj_true, 0.0)
 
         print(f"[seed {seed}] streaming moments + checkpoints ...", flush=True)
