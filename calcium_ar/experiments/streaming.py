@@ -115,8 +115,11 @@ class TorchMomentAccumulator:
 
 
 def stream_moments(
-    net,
+    net=None,
     *,
+    N: int | None = None,
+    sim_time: float | None = None,
+    spike_events=None,
     dt: float,
     lag: int,
     tau: float,
@@ -136,8 +139,15 @@ def stream_moments(
 
     Returns (moments, tau_est, mean_rate_hz) where moments maps
     checkpoint_samples -> (Cxx, Cyx)."""
-    N = net.N
-    T_total = int(round(net.sim_time / dt))
+    # Either a live BrunelNetwork, or (N, sim_time, spike_events) from a cache.
+    if net is not None:
+        N = net.N
+        sim_time = net.sim_time
+        if spike_events is None:
+            spike_events = net.get_spike_events()
+    if N is None or sim_time is None or spike_events is None:
+        raise ValueError("pass a net, or N + sim_time + spike_events")
+    T_total = int(round(sim_time / dt))
     # Spike events dominate RAM at high firing rates: a 5e6 ms recording of 12500
     # neurons at ~60 Hz is ~3.7e9 events, which at int64+float64+int64 is ~90 GB
     # (this OOM'd a 120 GB node). Store the index as int16 (N < 32767) and the
@@ -145,9 +155,9 @@ def stream_moments(
     # Then sort by time once so each chunk can be located with searchsorted,
     # instead of scanning every event with a boolean mask per chunk (which was
     # O(n_events * n_chunks) and the main reason streaming crawled).
-    idx, times = net.get_spike_events()
+    idx, times = spike_events
     n_events = len(times)
-    mean_rate = n_events / (N * net.sim_time / 1000.0)
+    mean_rate = n_events / (N * sim_time / 1000.0)
     times_samp = np.round(times / dt).astype(np.int32)
     del times
     idx = idx.astype(np.int16) if N <= 32767 else idx.astype(np.int32)
@@ -184,6 +194,9 @@ def stream_moments(
         _kd = torch.tensor(savgol_coeffs(smooth_win, 3, deriv=1, delta=dt, use="dot"),
                            dtype=torch.float32, device=device).reshape(1, 1, smooth_win)
         _tau_t = None
+        # dedicated device RNG so the noise stream is reproducible per run
+        _gen = torch.Generator(device=device)
+        _gen.manual_seed(int(seed))
 
     checkpoints = sorted(checkpoints_samples)
     results: dict[int, tuple[np.ndarray, np.ndarray]] = {}
@@ -202,25 +215,41 @@ def stream_moments(
         if hi > lo:
             np.add.at(spk, (idx[lo:hi].astype(np.intp),
                             (times_samp[lo:hi] - t0).astype(np.intp)), f32(1.0))
-        # calcium via AR(1) lfilter, carrying state zi across chunks
-        # (standard_normal(dtype=f32)*sigma is markedly faster than normal(0,sigma))
+        # calcium via AR(1) lfilter, carrying state zi across chunks.
+        # Noise generation dominates the CPU cost (~1.25e9 draws per chunk at
+        # N=12500), so on a device we draw it with the GPU RNG instead:
+        #   - sigma_intra feeds the CPU lfilter, so it is generated on the GPU and
+        #     copied back (a 2.5 GB copy is ~20x cheaper than generating on CPU);
+        #   - sigma_extra is added AFTER the AR, and F goes to the GPU anyway for
+        #     deconvolution, so it is generated AND added on-device: no transfer.
         inp = spk
         inp *= f32(amplitude)
-        inp += rng.standard_normal((N, L), dtype=np.float32) * f32(sigma_intra)
+        if device:
+            inp += (torch.randn((N, L), dtype=torch.float32, device=device,
+                                generator=_gen) * sigma_intra).cpu().numpy()
+        else:
+            inp += rng.standard_normal((N, L), dtype=np.float32) * f32(sigma_intra)
         C, zi = lfilter(b, a, inp, axis=1, zi=zi)
         del inp
-        F = C
-        F += rng.standard_normal((N, L), dtype=np.float32) * f32(sigma_extra)  # fluorescence
+        if device:
+            F = torch.as_tensor(C, dtype=torch.float32, device=device)
+            F += torch.randn((N, L), dtype=torch.float32, device=device,
+                             generator=_gen) * sigma_extra          # fluorescence
+        else:
+            F = C
+            F += rng.standard_normal((N, L), dtype=np.float32) * f32(sigma_extra)
         if tau_est is None:
-            tau_est = estimate_tau_robust(F, window_length=smooth_win,
+            tau_np = F.cpu().numpy() if device else F
+            tau_est = estimate_tau_robust(tau_np, window_length=smooth_win,
                                           method=tau_method, dt=dt)
+            del tau_np
         # deconvolve chunk -> feed (per-chunk; boundary error negligible for
         # large chunks). GPU: conv1d on device; CPU: scipy savgol.
         if device:
             if _tau_t is None:
                 _tau_t = torch.as_tensor(np.atleast_1d(tau_est), dtype=torch.float32,
                                          device=device).reshape(-1, 1)
-            Ft = torch.as_tensor(F, dtype=torch.float32, device=device).unsqueeze(1)
+            Ft = F.unsqueeze(1)                               # already on device
             Ft = _pad(Ft, (_half, _half), mode="replicate")   # edge-safe padding
             sm = conv1d(Ft, _ks).squeeze(1)
             dv = conv1d(Ft, _kd).squeeze(1)

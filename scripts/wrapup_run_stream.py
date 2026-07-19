@@ -75,6 +75,12 @@ def main():
     ap.add_argument("--methods", nargs="+", default=ALL_METHODS, choices=ALL_METHODS,
                     help="which estimators to solve (use 'ols ridge' at N=12500)")
     ap.add_argument("--out-root", default=None)
+    ap.add_argument("--cache-dir", default=None,
+                    help="cache ground-truth spikes here; reused instead of "
+                         "re-running NEST when the same net/seed/length is found")
+    ap.add_argument("--save-moments", action="store_true",
+                    help="also save Cxx/Cyx per checkpoint (~2.5 GB at N=12500) so "
+                         "new estimators can be solved in seconds without re-running")
     args = ap.parse_args()
 
     cfg = build_cfg(args.net)
@@ -90,16 +96,39 @@ def main():
     print(f"net={args.net} g={cfg['g']} eta={cfg['eta']}  sweep(ms)={args.sweep}  "
           f"seeds={args.seeds}  chunk_ms={args.chunk_ms}", flush=True)
 
+    cache = Path(args.cache_dir) if args.cache_dir else None
+    if cache:
+        cache.mkdir(parents=True, exist_ok=True)
+
     for seed in args.seeds:
-        print(f"[seed {seed}] simulating {max_T:.0f} ms (densify=False) ...", flush=True)
-        net = BrunelNetwork(
-            n_excitatory=cfg["n_excitatory"], n_inhibitory=cfg["n_inhibitory"],
-            epsilon=cfg["epsilon"], g=cfg["g"], eta=cfg["eta"], J_ex=cfg["J_ex"],
-            delay=cfg["delay"], V_reset=cfg["V_reset"],
-            sim_time=max_T, dt=dt,
-            n_threads=cfg["n_threads"], seed=seed)
-        net.build(); net.run(densify=False)
-        adj_true = net.get_adjacency(); np.fill_diagonal(adj_true, 0.0)
+        # --- ground truth: reuse the cached simulation when we already have it ---
+        tag = f"{args.net}_seed{seed}_T{int(max_T)//1000}k"
+        cf = (cache / f"{tag}.npz") if cache else None
+        net = None
+        if cf is not None and cf.exists():
+            print(f"[seed {seed}] loading cached ground truth {cf.name} "
+                  f"(skipping NEST)", flush=True)
+            z = np.load(cf)
+            spikes_cached = (z["idx"], z["times_ms"])
+            adj_true = z["adj_true"].astype(np.float64)
+        else:
+            print(f"[seed {seed}] simulating {max_T:.0f} ms (densify=False) ...",
+                  flush=True)
+            net = BrunelNetwork(
+                n_excitatory=cfg["n_excitatory"], n_inhibitory=cfg["n_inhibitory"],
+                epsilon=cfg["epsilon"], g=cfg["g"], eta=cfg["eta"], J_ex=cfg["J_ex"],
+                delay=cfg["delay"], V_reset=cfg["V_reset"],
+                sim_time=max_T, dt=dt,
+                n_threads=cfg["n_threads"], seed=seed)
+            net.build(); net.run(densify=False)
+            adj_true = net.get_adjacency()
+            spikes_cached = net.get_spike_events()
+            if cf is not None:
+                idx_c, t_c = spikes_cached
+                np.savez(cf, idx=idx_c.astype(np.int16), times_ms=t_c.astype(np.float32),
+                         adj_true=adj_true.astype(np.float32))
+                print(f"[seed {seed}] cached ground truth -> {cf}", flush=True)
+        np.fill_diagonal(adj_true, 0.0)
 
         print(f"[seed {seed}] streaming moments + checkpoints ...", flush=True)
 
@@ -115,12 +144,18 @@ def main():
             np.save(outdir / "adj_true.npy", _adj.astype(np.float32))
             for name, A in mats.items():
                 np.save(outdir / f"A_{name}.npy", A.astype(np.float32))
+            if args.save_moments:
+                # every estimator derives from these two N x N matrices, so a
+                # cached copy makes any NEW estimator a seconds-long job
+                np.save(outdir / "Cxx.npy", Cxx)
+                np.save(outdir / "Cyx.npy", Cyx)
             k0 = next(iter(mats))
             print(f"[seed {_seed}] T={T:.0f}ms SAVED -> {outdir}  "
                   f"|{k0}|max={np.abs(mats[k0]).max():.2e}", flush=True)
 
         moments, tau_est, rate = stream_moments(
-            net, dt=dt, lag=lag, tau=cfg["tau"], amplitude=cfg["amplitude"],
+            net, N=cfg["n_excitatory"] + cfg["n_inhibitory"], sim_time=max_T,
+            spike_events=spikes_cached, dt=dt, lag=lag, tau=cfg["tau"], amplitude=cfg["amplitude"],
             sigma_intra=cfg["sigma_intra"], sigma_extra=cfg["sigma_extra"],
             smooth_win=smooth_win, tau_method=cfg["tau_method"],
             checkpoints_samples=checkpoints, chunk_samples=chunk_samples, seed=seed,
