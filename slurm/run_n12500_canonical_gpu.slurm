@@ -60,9 +60,12 @@ mkdir -p "$WS/results/network_state"
 # (J=0.1, g=5, eta=2, V_reset=10 mV at N=12500 — no rescaling needed at this size).
 # ONE 5M-ms simulation per seed, scored at the 1M / 2M / 5M checkpoints, each
 # solved and SAVED as it is reached. 1 seed (seeds deferred to a revision).
+# --cache-dir : save the simulated network (skip NEST on future runs)
+# --save-moments : save Cxx/Cyx per checkpoint so new estimators solve in seconds
 "$PY" scripts/wrapup_run_stream.py --net n12500 \
       --sweep 1000000 2000000 5000000 --seeds 1 \
-      --methods ols ridge --device cuda --chunk-ms 5000
+      --methods ols ridge --device cuda --chunk-ms 5000 \
+      --cache-dir "$WS/gt_cache" --save-moments
 
 # Score ON THE CLUSTER — only the small metrics.csv needs to travel home.
 for Tk in 1000 2000 5000; do
