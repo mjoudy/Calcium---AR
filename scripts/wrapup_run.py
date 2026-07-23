@@ -93,6 +93,21 @@ NETS = {
                            g=6.0, eta=1.5, V_reset=10.0, sim_time=1_000_000.0,
                            n_threads=16, lam_l1=1e-4, lam_l2=1e-4,
                            name="wrapup_n12500lr"),
+    # --- R.4 scaling ladder -------------------------------------------------- #
+    # Same regime at every size so N is the ONLY variable: g=6, V_reset=10,
+    # J fluctuation-scaled (J*sqrt(C_E)=3.162), and eta tuned per size to ~14 Hz
+    # (scripts/r4_tune_regime.py). Measured: rate 13-15 Hz, CV 0.62-0.64,
+    # synchrony ~0.01 across all four. N=12500 is n12500_lowrate above
+    # (J=0.1, eta=1.5 -> 13.7 Hz, CV 0.62).
+    "n1250_r4": dict(n_excitatory=1000, n_inhibitory=250, J_ex=0.316, g=6.0,
+                     eta=1.05, V_reset=10.0, sim_time=500_000.0, n_threads=8,
+                     lam_l1=1e-4, lam_l2=1e-4, name="wrapup_n1250r4"),
+    "n2500_r4": dict(n_excitatory=2000, n_inhibitory=500, J_ex=0.224, g=6.0,
+                     eta=1.10, V_reset=10.0, sim_time=1_000_000.0, n_threads=8,
+                     lam_l1=1e-4, lam_l2=1e-4, name="wrapup_n2500r4"),
+    "n5000_r4": dict(n_excitatory=4000, n_inhibitory=1000, J_ex=0.158, g=6.0,
+                     eta=1.30, V_reset=10.0, sim_time=2_000_000.0, n_threads=8,
+                     lam_l1=1e-4, lam_l2=1e-4, name="wrapup_n5000r4"),
 }
 
 
