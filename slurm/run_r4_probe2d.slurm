@@ -49,4 +49,4 @@ echo; echo "done: $(date)"
 echo "--- copy home (tiny files) ---"
 ls -lh "$OUT"
 echo
-echo "rsync -av nemo:$OUT/ ~/calcium_results/regime2d/"
+echo "rsync -avhz ${USER}@login1.nemo.uni-freiburg.de:$OUT/ ~/calcium_results/regime2d/"
