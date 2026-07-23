@@ -83,11 +83,14 @@ def main():
     ap.add_argument("--sim-time", type=float, default=4000.0)
     ap.add_argument("--warmup-ms", type=float, default=1000.0)
     ap.add_argument("--n-threads", type=int, default=8)
-    ap.add_argument("--sizes", type=int, nargs="+", default=None,
-                    help="subset of N to tune (default: all four)")
+    # N=12500 is ALREADY tuned: the existing low-rate run (g=6, eta=1.5, J=0.1,
+    # V_reset=10) measured 13.7 Hz / CV 0.62, i.e. the target regime — so it is
+    # skipped by default (and it is also the slowest to simulate).
+    ap.add_argument("--sizes", type=int, nargs="+", default=[1250, 2500, 5000],
+                    help="which N to tune (default: the three that are not yet known)")
     args = ap.parse_args()
 
-    sizes = [s for s in SIZES if args.sizes is None or s[0] in args.sizes]
+    sizes = [s for s in SIZES if s[0] in args.sizes]
     print(f"target rate ~{args.target} Hz   g=6  V_reset=10  "
           f"J*sqrt(C_E)={JBASE:.3f}\n")
     print(f"{'N':>6} {'C_E':>5} {'J':>6} {'eta':>5} | {'rate':>6} {'CV':>5} "

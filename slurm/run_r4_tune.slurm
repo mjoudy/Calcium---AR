@@ -3,9 +3,10 @@
 # regime (AI) at the SAME rate (~14 Hz), leaving N as the only variable in the
 # scaling sweep.
 #
-# Cost: 4 sizes x 14 eta values = 56 short (4 s) simulations. The N=12500 ones
-# dominate. Statistics are computed from sparse spike events, so memory stays
-# modest (no dense (N,T) matrix).
+# Cost: 3 sizes x 14 eta values = 42 short (4 s) simulations. N=12500 is SKIPPED
+# because it is already tuned (the existing low-rate run: g=6, eta=1.5, J=0.1,
+# V_reset=10 -> 13.7 Hz, CV 0.62) and it was also the slowest to simulate.
+# Statistics come from sparse spike events, so memory stays modest.
 #
 # Submit:  cd $(ws_find calcium_ar)/Calcium---AR
 #          sbatch slurm/run_r4_tune.slurm
@@ -18,8 +19,8 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
-#SBATCH --mem=32G
-#SBATCH --time=02:00:00
+#SBATCH --mem=16G
+#SBATCH --time=01:00:00
 #SBATCH --output=slurm_logs/r4_tune_%j.log
 
 set -eo pipefail
