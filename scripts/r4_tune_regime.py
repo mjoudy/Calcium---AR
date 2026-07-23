@@ -88,22 +88,31 @@ def main():
     # skipped by default (and it is also the slowest to simulate).
     ap.add_argument("--sizes", type=int, nargs="+", default=[1250, 2500, 5000],
                     help="which N to tune (default: the three that are not yet known)")
+    # g and J set the IRREGULARITY, eta sets the RATE — see the 2-D probe
+    # (scripts/r4_probe_2d.py): at a fixed 14 Hz, CV rises with both g and J.
+    # Pass the family the probe picked; eta is then re-fitted per size.
+    ap.add_argument("--g", type=float, default=6.0)
+    ap.add_argument("--j-scale", type=float, default=1.0,
+                    help="multiply the fluctuation-scaled J")
+    ap.add_argument("--etas", type=float, nargs="+", default=None,
+                    help="override the eta grid (narrow it once the range is known)")
     args = ap.parse_args()
 
     sizes = [s for s in SIZES if s[0] in args.sizes]
-    print(f"target rate ~{args.target} Hz   g=6  V_reset=10  "
-          f"J*sqrt(C_E)={JBASE:.3f}\n")
+    etas = args.etas if args.etas else ETAS
+    print(f"target rate ~{args.target} Hz   g={args.g:g}  V_reset=10  "
+          f"J*sqrt(C_E)={JBASE:.3f} (x{args.j_scale:g})\n")
     print(f"{'N':>6} {'C_E':>5} {'J':>6} {'eta':>5} | {'rate':>6} {'CV':>5} "
           f"{'sync':>6} {'silent':>6}")
     print("-" * 60)
     picks = {}
     for N, NE, NI in sizes:
         C_E = int(0.1 * NE)
-        J = JBASE / np.sqrt(C_E)
+        J = args.j_scale * JBASE / np.sqrt(C_E)
         best = None
-        for eta in ETAS:
+        for eta in etas:
             net = BrunelNetwork(n_excitatory=NE, n_inhibitory=NI, epsilon=0.1,
-                                g=6.0, eta=eta, J_ex=J, V_reset=10.0, delay=1.5,
+                                g=args.g, eta=eta, J_ex=J, V_reset=10.0, delay=1.5,
                                 sim_time=args.sim_time, dt=0.1,
                                 n_threads=args.n_threads, seed=1)
             net.build(); net.run(densify=False)       # <- never densify

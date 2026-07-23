@@ -52,6 +52,11 @@ def save(fig, stem: str | Path, dpi: int = 200):
     """Save both a vector PDF (for the journal) and a PNG preview."""
     stem = Path(stem)
     stem.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(stem.with_suffix(".pdf"))
-    fig.savefig(stem.with_suffix(".png"), dpi=dpi)
-    print(f"wrote {stem.with_suffix('.pdf')} and .png")
+    if stem.suffix.lower() in (".pdf", ".png"):
+        stem = stem.with_suffix("")
+    # append, never with_suffix(): a stem like "fig_j1.5" would otherwise lose
+    # the ".5" and silently overwrite "fig_j1"
+    pdf, png = Path(f"{stem}.pdf"), Path(f"{stem}.png")
+    fig.savefig(pdf)
+    fig.savefig(png, dpi=dpi)
+    print(f"wrote {pdf} and .png")
