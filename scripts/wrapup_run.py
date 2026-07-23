@@ -94,20 +94,35 @@ NETS = {
                            n_threads=16, lam_l1=1e-4, lam_l2=1e-4,
                            name="wrapup_n12500lr"),
     # --- R.4 scaling ladder -------------------------------------------------- #
-    # Same regime at every size so N is the ONLY variable: g=6, V_reset=10,
-    # J fluctuation-scaled (J*sqrt(C_E)=3.162), and eta tuned per size to ~14 Hz
-    # (scripts/r4_tune_regime.py). Measured: rate 13-15 Hz, CV 0.62-0.64,
-    # synchrony ~0.01 across all four. N=12500 is n12500_lowrate above
-    # (J=0.1, eta=1.5 -> 13.7 Hz, CV 0.62).
-    "n1250_r4": dict(n_excitatory=1000, n_inhibitory=250, J_ex=0.316, g=6.0,
-                     eta=1.05, V_reset=10.0, sim_time=500_000.0, n_threads=8,
+    # Same regime at every size so N is the ONLY variable: g=8, V_reset=10,
+    # J fluctuation-scaled (J*sqrt(C_E) = 1.5*0.1*sqrt(1000) = 4.743), and eta
+    # tuned per size to ~14 Hz (scripts/r4_tune_regime.py --g 8 --j-scale 1.5).
+    #
+    # VERIFIED (4 s sims, 1 s warm-up, seed 1):
+    #   N= 1250  J=0.474  eta=1.30 -> 14.8 Hz  CV 0.98  sync 0.010
+    #   N= 2500  J=0.335  eta=1.50 -> 13.9 Hz  CV 0.98  sync 0.008
+    #   N= 5000  J=0.237  eta=1.90 -> 14.4 Hz  CV 1.03  sync 0.007
+    #   N=12500  J=0.150  eta=2.60 -> 13.9 Hz  CV 1.06  sync 0.007
+    #
+    # Why g=8 and not Brunel's g=6: at g=6 with J*sqrt(C_E)=3.162 the same ~14 Hz
+    # comes out at CV ~0.63 — asynchronous but only moderately irregular. The 2-D
+    # probe (results/regime2d/) showed CV rises with BOTH g and J at fixed rate,
+    # while synchrony FALLS with g, so this family is AI on both counts. It is a
+    # deliberate departure from the canonical point, which lives in n12500 above.
+    "n1250_r4": dict(n_excitatory=1000, n_inhibitory=250, J_ex=0.474, g=8.0,
+                     eta=1.30, V_reset=10.0, sim_time=500_000.0, n_threads=8,
                      lam_l1=1e-4, lam_l2=1e-4, name="wrapup_n1250r4"),
-    "n2500_r4": dict(n_excitatory=2000, n_inhibitory=500, J_ex=0.224, g=6.0,
-                     eta=1.10, V_reset=10.0, sim_time=1_000_000.0, n_threads=8,
+    "n2500_r4": dict(n_excitatory=2000, n_inhibitory=500, J_ex=0.335, g=8.0,
+                     eta=1.50, V_reset=10.0, sim_time=1_000_000.0, n_threads=8,
                      lam_l1=1e-4, lam_l2=1e-4, name="wrapup_n2500r4"),
-    "n5000_r4": dict(n_excitatory=4000, n_inhibitory=1000, J_ex=0.158, g=6.0,
-                     eta=1.30, V_reset=10.0, sim_time=2_000_000.0, n_threads=8,
+    "n5000_r4": dict(n_excitatory=4000, n_inhibitory=1000, J_ex=0.237, g=8.0,
+                     eta=1.90, V_reset=10.0, sim_time=2_000_000.0, n_threads=8,
                      lam_l1=1e-4, lam_l2=1e-4, name="wrapup_n5000r4"),
+    # top rung: the old n12500_lowrate run (g=6, J=0.1) is NOT part of this
+    # ladder any more and has to be re-simulated at the new family.
+    "n12500_r4": dict(n_excitatory=10000, n_inhibitory=2500, J_ex=0.150, g=8.0,
+                      eta=2.60, V_reset=10.0, sim_time=5_000_000.0, n_threads=16,
+                      lam_l1=1e-4, lam_l2=1e-4, name="wrapup_n12500r4"),
 }
 
 

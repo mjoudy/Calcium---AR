@@ -10,8 +10,8 @@ recording length) and draws:
 rows = correlation and excitatory recall (the two measures with dynamic range;
 ROC-AUC saturates and squashes the collapse against the ceiling).
 
-All four sizes share one regime (~14 Hz, CV ~0.63, synchrony ~0.01), so N is the
-only variable. OLS only.
+All four sizes share one AI regime (13.9-14.8 Hz, CV 0.98-1.06, synchrony
+0.007-0.010), so N is the only variable. OLS only.
 
 Usage:
   python scripts/fig_r4_plot.py --root /home/mjoudy/calcium_results/hpc_metrics \
@@ -35,7 +35,7 @@ DT = 0.1  # ms per sample
 
 # N -> directory prefix (the R.4 ladder; N=12500 reuses the low-rate A2 run)
 LADDER = [(1250, "wrapup_n1250r4_T"), (2500, "wrapup_n2500r4_T"),
-          (5000, "wrapup_n5000r4_T"), (12500, "wrapup_n12500lr_T")]
+          (5000, "wrapup_n5000r4_T"), (12500, "wrapup_n12500r4_T")]
 MEASURES = [("corr", "correlation"), ("E_rec", "excitatory recall")]
 
 

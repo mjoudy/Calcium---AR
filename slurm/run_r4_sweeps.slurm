@@ -1,12 +1,12 @@
 #!/bin/bash
-# R.4 scaling sweep: the same AI regime (~14 Hz, CV ~0.63) at four network sizes,
-# each scored at MATCHED samples-per-neuron T/N = 800 / 1600 / 4000.
+# R.4 scaling sweep, sizes 1250 / 2500 / 5000, each scored at MATCHED
+# samples-per-neuron T/N = 800 / 1600 / 4000 (T_ms = N * 0.1 ms * T/N).
 #
-#   N= 1250 (J=0.316, eta=1.05):  100k /  200k /  500k ms
-#   N= 2500 (J=0.224, eta=1.10):  200k /  400k / 1000k ms
-#   N= 5000 (J=0.158, eta=1.30):  400k /  800k / 2000k ms
-#   N=12500 (J=0.100, eta=1.50): 1000k / 2000k / 5000k ms  <- ALREADY DONE
-#                                 (results/wrapup_n12500lr_T*k, reused)
+# One AI regime at every size (g=8, V_reset=10, J*sqrt(C_E)=4.743, eta per size):
+#   N= 1250 (J=0.474, eta=1.30, 14.8 Hz, CV 0.98):  100k /  200k /  500k ms
+#   N= 2500 (J=0.335, eta=1.50, 13.9 Hz, CV 0.98):  200k /  400k / 1000k ms
+#   N= 5000 (J=0.237, eta=1.90, 14.4 Hz, CV 1.03):  400k /  800k / 2000k ms
+#   N=12500 -> slurm/run_r4_n12500.slurm (its own job, much longer)
 #
 # OLS only (the estimator story lives in R.5). Moments and ground truth are
 # cached so any later estimator experiment at these sizes is seconds, not hours.
