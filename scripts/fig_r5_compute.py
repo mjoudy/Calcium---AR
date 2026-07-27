@@ -30,12 +30,16 @@ from __future__ import annotations
 
 import argparse
 import csv
+import os
 import sys
 from pathlib import Path
 
 import numpy as np
 
 ROOT = Path(__file__).resolve().parent.parent
+# results live under the workspace on the cluster (matches the R.4 runners), and
+# under the repo locally; honor the same env var the streaming runner uses.
+BASE = Path(os.environ.get("CALCIUM_AR_WORKDIR", ROOT))
 sys.path.insert(0, str(ROOT)); sys.path.insert(0, str(ROOT / "scripts"))
 from calcium_ar.solvers.from_moments import (
     ols_from_moments, fista_from_moments, dale_from_moments, strongest_entry_types)
@@ -147,7 +151,7 @@ def main():
     if not ckpts:
         raise SystemExit(f"no {prefix}*k dirs under {root}")
 
-    out_dir = Path(args.out_dir) if args.out_dir else (ROOT / "results" / "r5")
+    out_dir = Path(args.out_dir) if args.out_dir else (BASE / "results" / "r5")
     out_dir.mkdir(parents=True, exist_ok=True)
     rows = []
 

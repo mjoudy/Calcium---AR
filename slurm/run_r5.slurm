@@ -53,12 +53,17 @@ echo "=== phase 1: extend checkpoints into the data-scarce regime ==="
       --cache-dir "$WS/gt_cache" --save-moments
 
 # --- phase 2: lambda sweep + scoring from the cached moments ------------------
+# out-dir pinned under $WS so it sits with the R.4 results (the compute script's
+# own default is the repo dir, which would land elsewhere).
 echo "=== phase 2: R.5 solve + score ==="
-"$PY" scripts/fig_r5_compute.py --root "$WS/results" --net n1250r4  --device cpu
-"$PY" scripts/fig_r5_compute.py --root "$WS/results" --net n12500r4 --device cuda
+R5OUT="$WS/results/r5"
+"$PY" scripts/fig_r5_compute.py --root "$WS/results" --net n1250r4  --device cpu  --out-dir "$R5OUT"
+"$PY" scripts/fig_r5_compute.py --root "$WS/results" --net n12500r4 --device cuda --out-dir "$R5OUT"
 
 echo "done: $(date)"
 echo "--- copy home just these: ---"
-ls -lh "$WS"/results/r5/*.csv 2>/dev/null
+ls -lh "$R5OUT"/*.csv 2>/dev/null || echo "(no csv found in $R5OUT)"
+echo
+echo "rsync -avhz ${USER}@login1.nemo.uni-freiburg.de:$R5OUT/ ~/calcium_results/r5/"
 echo
 echo "rsync -avhz ${USER}@login1.nemo.uni-freiburg.de:$WS/results/r5/ ~/calcium_results/r5/"
