@@ -14,6 +14,12 @@ canonical is the high-rate reference. NOTE the tuned-AI run also has larger J, s
 the low-rate -> tuned-AI contrast changes CV and coupling together — this figure
 is a descriptive regime comparison, not a single-variable causal claim.
 
+MEASURED (OLS, T/N=4000): canonical E_rec 0.768 > low-rate 0.686 > tuned-AI 0.466.
+So (1) firing rate helps most (canonical, 59 Hz, wins on everything) and (2) at a
+FIXED 14 Hz the milder low-rate regime (CV 0.62) beats the textbook-AI tuned run
+(CV 1.06) — more irregular is HARDER to infer, the opposite of the initial guess.
+Realism (CV~1) and recoverability pull in opposite directions here.
+
     left  column : metric vs recording length (one line per regime)
     right column : the same metric at the longest recording, as labelled bars
 
@@ -116,8 +122,8 @@ def main():
             tn_max = round(T_LENGTHS[-1] * 1000 / DT / N)
             axR.set_title(f"at the longest recording (T/N = {tn_max})")
 
-    fig.suptitle("Dynamical regime and recovery at N=12500 (OLS): "
-                 "does the regime change what can be inferred?",
+    fig.suptitle("Recovery at N=12500 (OLS) improves with firing rate; at a fixed "
+                 "14 Hz the milder, lower-CV regime wins",
                  fontsize=13, color=fs.INK, x=0.08, ha="left", y=0.965)
     fs.save(fig, args.out)
 

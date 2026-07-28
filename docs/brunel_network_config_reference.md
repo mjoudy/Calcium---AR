@@ -63,6 +63,24 @@
 > fluctuation-scaling (1.30 -> 2.60), and g=8 is a deliberate departure from
 > Brunel's g=6 — the canonical point stays in the `n12500` preset.
 >
+> ### VERIFIED 2026-07-28 (R.6) — CV~1 was tuned for REALISM, not recoverability
+> Three N=12500 regimes scored identically (OLS, T/N=4000, 10% operating point):
+>
+> | regime | rate | CV | corr | E_rec |
+> |--------|------|----|------|-------|
+> | canonical (g6, J0.1, eta4)   | 59 Hz | 0.86 | 0.914 | **0.768** |
+> | low-rate  (g6, J0.1, eta1.5) | 14 Hz | 0.62 | 0.867 | **0.686** |
+> | tuned-AI  (g8, J0.15, eta2.6)| 14 Hz | 1.06 | 0.835 | **0.466** |
+>
+> (1) **Firing rate helps most** — canonical wins on everything (~4x the rate ->
+> ~4x more spikes -> more information). (2) **At a fixed 14 Hz, MORE irregular is
+> WORSE**: low-rate (CV 0.62) beats the textbook-AI tuned run (CV 1.06). Lower CV =
+> more regular, evenly-spaced spikes = more effective independent samples for the
+> linear fit; CV~1 is burstier so information clumps. So the R.4 push to CV~1 buys
+> biological realism at a COST in recoverability — the two objectives conflict.
+> Caveat: tuned-AI also has larger g and J, so at fixed rate the CV effect is
+> confounded with inhibition strength (a controlled eta-sweep would separate them).
+>
 > ### V_reset matters and was wrong in this codebase until 2026-07-18
 > `BrunelNetwork` hardcoded **V_reset = 0**; Brunel uses **V_r = 10 mV** (as this
 > document already stated). V_r=0 suppresses irregularity — measured at N=1250,
