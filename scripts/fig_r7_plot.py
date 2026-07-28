@@ -46,7 +46,8 @@ def main():
     fig.subplots_adjust(left=0.07, right=0.98, top=0.86, bottom=0.14, wspace=0.24)
 
     axL = axes[0][0]
-    series = [("E_rec", "excitatory recall", fs.C_E, "-"),
+    series = [("corr", "correlation", fs.INK, "-"),
+              ("E_rec", "excitatory recall", fs.C_E, "-"),
               ("E_prec", "excitatory precision", fs.C_E, "--"),
               ("I_rec", "inhibitory recall", fs.C_I, "-")]
     for key, lab, col, ls in series:
