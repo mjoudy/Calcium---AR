@@ -114,6 +114,60 @@ class TorchMomentAccumulator:
         return Cxx.cpu().numpy(), Cyx.cpu().numpy()
 
 
+class MultiLagAccumulator:
+    """Cross-covariances C(l) = <x(t+l) x(t)^T> at SEVERAL lags at once, sharing a
+    common predictor block so every lag uses the same time points t (one mu_prev).
+
+    Used by R.8 phase 2 to read the TIMING of each coupling (instantaneous vs
+    delayed) independently of its direction. torch-based, so it runs on GPU
+    (device='cuda') for N=12500 or CPU (device='cpu') for tests. snapshot()
+    returns {lag: C(lag) numpy float64}. Leaves the single-lag path untouched."""
+
+    def __init__(self, N: int, lags, device: str = "cpu"):
+        import torch
+        self.torch = torch
+        self.N, self.device = N, device
+        self.lags = sorted({int(l) for l in lags})
+        self.maxlag = max(self.lags)
+        self.Craw = {l: torch.zeros(N, N, dtype=torch.float64, device=device)
+                     for l in self.lags}
+        self.s_prev = torch.zeros(N, dtype=torch.float64, device=device)
+        self.s_now = {l: torch.zeros(N, dtype=torch.float64, device=device)
+                      for l in self.lags}
+        self.n = 0
+        self.tail = torch.zeros(N, 0, dtype=torch.float32, device=device)
+
+    def add(self, feed_chunk) -> None:
+        t = self.torch
+        fc = (feed_chunk.to(dtype=t.float32) if isinstance(feed_chunk, t.Tensor)
+              else t.as_tensor(feed_chunk, dtype=t.float32, device=self.device))
+        buf = t.cat([self.tail, fc], dim=1)
+        Lc = buf.shape[1] - self.maxlag            # common predictor width
+        if Lc <= 0:
+            self.tail = buf
+            return
+        xp = buf[:, :Lc]                            # predictor at t
+        self.s_prev += xp.sum(1).double()
+        for l in self.lags:
+            xn = buf[:, l:l + Lc]                   # response at t+l
+            self.Craw[l] += (xn @ xp.T).double()
+            self.s_now[l] += xn.sum(1).double()
+        self.n += Lc
+        self.tail = buf[:, -self.maxlag:].clone()
+
+    def snapshot(self) -> dict:
+        if self.n == 0:
+            raise RuntimeError("no pairs accumulated yet")
+        t = self.torch
+        mu_p = self.s_prev / self.n
+        out = {}
+        for l in self.lags:
+            mu_n = self.s_now[l] / self.n
+            C = (self.Craw[l] - self.n * t.outer(mu_n, mu_p)) / self.n
+            out[l] = C.cpu().numpy()
+        return out
+
+
 def stream_moments(
     net=None,
     *,
@@ -133,6 +187,7 @@ def stream_moments(
     seed: int = 1,
     device: str | None = None,
     on_checkpoint=None,
+    lags: list[int] | None = None,
 ):
     """Stream calcium -> feed in chunks from a *run* BrunelNetwork (densify=False)
     and accumulate moments, snapshotting at each checkpoint (in samples).
@@ -176,8 +231,14 @@ def stream_moments(
     rng = np.random.default_rng(seed)
     f32 = np.float32
 
-    acc = (TorchMomentAccumulator(N, lag, device=device) if device
-           else MomentAccumulator(N, lag))
+    # multi-lag path (R.8 phase 2): accumulate C(l) at several lags. Leaves the
+    # single-lag Cxx/Cyx behaviour identical when lags is None.
+    multilag = lags is not None
+    if multilag:
+        acc = MultiLagAccumulator(N, lags, device=device or "cpu")
+    else:
+        acc = (TorchMomentAccumulator(N, lag, device=device) if device
+               else MomentAccumulator(N, lag))
 
     # GPU deconvolution: Savitzky-Golay smoothing/derivative are fixed
     # convolutions, so on the device we run them as conv1d (matches scipy on
@@ -260,21 +321,28 @@ def stream_moments(
             acc.add(reconstruct_feed(smooth, deriv, tau_est))
         t0 = t1
         while ci < len(checkpoints) and t1 >= checkpoints[ci]:
-            Cxx_cp, Cyx_cp = acc.snapshot()
-            if on_checkpoint is not None:
-                # solve + persist immediately, so a wall-clock timeout later
-                # still leaves the earlier checkpoints on disk
-                on_checkpoint(checkpoints[ci], Cxx_cp, Cyx_cp)
-            else:
-                results[checkpoints[ci]] = (Cxx_cp, Cyx_cp)
+            _emit(acc, checkpoints[ci], multilag, on_checkpoint, results)
             ci += 1
 
     # snapshot at full length for any checkpoints beyond T_total
     while ci < len(checkpoints):
-        Cxx_cp, Cyx_cp = acc.snapshot()
-        if on_checkpoint is not None:
-            on_checkpoint(checkpoints[ci], Cxx_cp, Cyx_cp)
-        else:
-            results[checkpoints[ci]] = (Cxx_cp, Cyx_cp)
+        _emit(acc, checkpoints[ci], multilag, on_checkpoint, results)
         ci += 1
     return results, tau_est, mean_rate
+
+
+def _emit(acc, cp, multilag, on_checkpoint, results):
+    """Snapshot at checkpoint cp; solve+persist now (callback) or store. Multi-lag
+    hands the callback a {lag: C(lag)} dict; single-lag hands (Cxx, Cyx)."""
+    snap = acc.snapshot()
+    if multilag:
+        if on_checkpoint is not None:
+            on_checkpoint(cp, snap)
+        else:
+            results[cp] = snap
+    else:
+        Cxx_cp, Cyx_cp = snap
+        if on_checkpoint is not None:
+            on_checkpoint(cp, Cxx_cp, Cyx_cp)
+        else:
+            results[cp] = (Cxx_cp, Cyx_cp)
