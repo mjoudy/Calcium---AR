@@ -188,6 +188,7 @@ def stream_moments(
     device: str | None = None,
     on_checkpoint=None,
     lags: list[int] | None = None,
+    raw_calcium: bool = False,
 ):
     """Stream calcium -> feed in chunks from a *run* BrunelNetwork (densify=False)
     and accumulate moments, snapshotting at each checkpoint (in samples).
@@ -304,9 +305,13 @@ def stream_moments(
             tau_est = estimate_tau_robust(tau_np, window_length=smooth_win,
                                           method=tau_method, dt=dt)
             del tau_np
-        # deconvolve chunk -> feed (per-chunk; boundary error negligible for
-        # large chunks). GPU: conv1d on device; CPU: scipy savgol.
-        if device:
+        # raw_calcium=True: accumulate moments on the fluorescence F directly (no
+        # deconvolution), for the preprocessing-effect comparison. Otherwise
+        # deconvolve chunk -> feed (per-chunk; boundary error negligible for large
+        # chunks). GPU: conv1d on device; CPU: scipy savgol.
+        if raw_calcium:
+            acc.add(F)
+        elif device:
             if _tau_t is None:
                 _tau_t = torch.as_tensor(np.atleast_1d(tau_est), dtype=torch.float32,
                                          device=device).reshape(-1, 1)
