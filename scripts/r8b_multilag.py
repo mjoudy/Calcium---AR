@@ -53,8 +53,9 @@ def main():
     ap.add_argument("--out-dir", default=None)
     args = ap.parse_args()
 
-    import torch
+    torch = None
     if args.device == "cuda":
+        import torch
         assert torch.cuda.is_available(), "no CUDA — use --device cpu"
 
     cfg = build_cfg(args.net)
@@ -91,25 +92,30 @@ def main():
     snap = res[cp]                                   # {lag: C(lag) numpy}
     print(f"streamed; mean rate {rate:.1f} Hz")
 
+    # per-lag connectivity A_l = C(l) C(0)^-1. GPU (torch) at large N; numpy on CPU
+    # (small N=1250 inverses are instant and the CPU env has no torch).
     dev = args.device
-    C0 = torch.tensor(snap[0], device=dev, dtype=torch.float32)
-    C0inv = torch.linalg.inv(C0 + 1e-9 * torch.eye(N, device=dev, dtype=torch.float32))
-    del C0
-
     i, j, _ = edge_index(N, args.sample, np.random.default_rng(0))
-    ii = torch.tensor(i, device=dev); jj = torch.tensor(j, device=dev)
     g = adj.T[i, j]                                  # true j->i
-    # per-lag A[i,j] and A[j,i] for sampled pairs
     P = len(i); nL = len(pos_lags)
     a_ij = np.zeros((P, nL), np.float32); a_ji = np.zeros((P, nL), np.float32)
-    for k, l in enumerate(pos_lags):
-        Cl = torch.tensor(snap[l], device=dev, dtype=torch.float32)
-        A = Cl @ C0inv; A.fill_diagonal_(0.0)
-        a_ij[:, k] = A[ii, jj].cpu().numpy()
-        a_ji[:, k] = A[jj, ii].cpu().numpy()
-        del Cl, A
-        if dev == "cuda":
-            torch.cuda.empty_cache()
+
+    if dev == "cuda":
+        C0 = torch.tensor(snap[0], device=dev, dtype=torch.float32)
+        C0inv = torch.linalg.inv(C0 + 1e-9 * torch.eye(N, device=dev, dtype=torch.float32))
+        del C0
+        ii = torch.tensor(i, device=dev); jj = torch.tensor(j, device=dev)
+        for k, l in enumerate(pos_lags):
+            Cl = torch.tensor(snap[l], device=dev, dtype=torch.float32)
+            A = Cl @ C0inv; A.fill_diagonal_(0.0)
+            a_ij[:, k] = A[ii, jj].cpu().numpy()
+            a_ji[:, k] = A[jj, ii].cpu().numpy()
+            del Cl, A; torch.cuda.empty_cache()
+    else:
+        C0inv = np.linalg.inv(snap[0] + 1e-9 * np.eye(N))
+        for k, l in enumerate(pos_lags):
+            A = snap[l] @ C0inv; np.fill_diagonal(A, 0.0)
+            a_ij[:, k] = A[i, j]; a_ji[:, k] = A[j, i]
 
     est = pos_lags.index(lag_est)                    # column of the estimator lag
     a_est = a_ij[:, est]; arev_est = a_ji[:, est]
