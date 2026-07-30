@@ -70,15 +70,25 @@ def main():
     print(f"net={args.net} N={N} dt={dt} lag_est={lag_est} ({cfg['lag_ms']}ms)")
     print(f"lags(samples)={lags}  positive={pos_lags}")
 
-    # cached spikes + ground truth
+    # cached spikes + ground truth: pick the LONGEST recording (tag ..._T<ms/1000>k),
+    # not the alphabetically-last file (which mis-picks e.g. T50k over T500k).
     cache = Path(args.cache_dir)
-    cand = sorted(cache.glob(f"{args.net}_seed1_*.npz"))
+    cand = list(cache.glob(f"{args.net}_seed1_*.npz"))
     if not cand:
         raise SystemExit(f"no cached spikes {args.net}_seed1_*.npz under {cache}")
-    z = np.load(cand[-1], allow_pickle=False)
+    def _tk(p):
+        import re
+        m = re.search(r"_T(\d+)k_", p.name)
+        return int(m.group(1)) if m else -1
+    best = max(cand, key=_tk); T_avail_ms = _tk(best) * 1000.0
+    z = np.load(best, allow_pickle=False)
     spikes = (z["idx"], z["times_ms"]); adj = z["adj_true"].astype(np.float64)
     np.fill_diagonal(adj, 0.0)
-    print(f"loaded {cand[-1].name}")
+    if T_avail_ms > 0 and args.checkpoint_ms > T_avail_ms:
+        print(f"clamping checkpoint {args.checkpoint_ms/1000:.0f}k -> available "
+              f"{T_avail_ms/1000:.0f}k ms")
+        args.checkpoint_ms = T_avail_ms
+    print(f"loaded {best.name}  (T={T_avail_ms/1000:.0f}k ms)")
 
     cp = round(args.checkpoint_ms / dt)
     res, _, rate = stream_moments(

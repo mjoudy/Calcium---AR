@@ -119,52 +119,67 @@ class MultiLagAccumulator:
     common predictor block so every lag uses the same time points t (one mu_prev).
 
     Used by R.8 phase 2 to read the TIMING of each coupling (instantaneous vs
-    delayed) independently of its direction. torch-based, so it runs on GPU
-    (device='cuda') for N=12500 or CPU (device='cpu') for tests. snapshot()
-    returns {lag: C(lag) numpy float64}. Leaves the single-lag path untouched."""
+    delayed) independently of its direction. Uses torch on GPU (device='cuda') for
+    N=12500 and plain numpy on CPU (device='cpu'/None), so the CPU env that has no
+    torch still works. snapshot() returns {lag: C(lag) numpy float64}. Leaves the
+    single-lag path untouched."""
 
     def __init__(self, N: int, lags, device: str = "cpu"):
-        import torch
-        self.torch = torch
-        self.N, self.device = N, device
+        self.gpu = device not in (None, "cpu")
+        self.device = device
         self.lags = sorted({int(l) for l in lags})
         self.maxlag = max(self.lags)
-        self.Craw = {l: torch.zeros(N, N, dtype=torch.float64, device=device)
-                     for l in self.lags}
-        self.s_prev = torch.zeros(N, dtype=torch.float64, device=device)
-        self.s_now = {l: torch.zeros(N, dtype=torch.float64, device=device)
-                      for l in self.lags}
+        if self.gpu:
+            import torch
+            self.torch = torch
+            z2 = lambda: torch.zeros(N, N, dtype=torch.float64, device=device)
+            z1 = lambda: torch.zeros(N, dtype=torch.float64, device=device)
+            self.tail = torch.zeros(N, 0, dtype=torch.float32, device=device)
+        else:
+            z2 = lambda: np.zeros((N, N), dtype=np.float64)
+            z1 = lambda: np.zeros(N, dtype=np.float64)
+            self.tail = np.zeros((N, 0), dtype=np.float32)
+        self.N = N
+        self.Craw = {l: z2() for l in self.lags}
+        self.s_prev = z1()
+        self.s_now = {l: z1() for l in self.lags}
         self.n = 0
-        self.tail = torch.zeros(N, 0, dtype=torch.float32, device=device)
 
     def add(self, feed_chunk) -> None:
-        t = self.torch
-        fc = (feed_chunk.to(dtype=t.float32) if isinstance(feed_chunk, t.Tensor)
-              else t.as_tensor(feed_chunk, dtype=t.float32, device=self.device))
-        buf = t.cat([self.tail, fc], dim=1)
+        if self.gpu:
+            t = self.torch
+            fc = (feed_chunk.to(dtype=t.float32) if isinstance(feed_chunk, t.Tensor)
+                  else t.as_tensor(feed_chunk, dtype=t.float32, device=self.device))
+            buf = t.cat([self.tail, fc], dim=1)
+            f64 = lambda x: x.double()
+        else:
+            fc = np.asarray(feed_chunk, dtype=np.float32)
+            buf = np.concatenate([self.tail, fc], axis=1)
+            f64 = lambda x: x.astype(np.float64)
         Lc = buf.shape[1] - self.maxlag            # common predictor width
         if Lc <= 0:
             self.tail = buf
             return
         xp = buf[:, :Lc]                            # predictor at t
-        self.s_prev += xp.sum(1).double()
+        self.s_prev += f64(xp.sum(1))
         for l in self.lags:
             xn = buf[:, l:l + Lc]                   # response at t+l
-            self.Craw[l] += (xn @ xp.T).double()
-            self.s_now[l] += xn.sum(1).double()
+            self.Craw[l] += f64(xn @ xp.T)
+            self.s_now[l] += f64(xn.sum(1))
         self.n += Lc
-        self.tail = buf[:, -self.maxlag:].clone()
+        self.tail = (buf[:, -self.maxlag:].clone() if self.gpu
+                     else buf[:, -self.maxlag:].copy())
 
     def snapshot(self) -> dict:
         if self.n == 0:
             raise RuntimeError("no pairs accumulated yet")
-        t = self.torch
+        outer = self.torch.outer if self.gpu else np.outer
         mu_p = self.s_prev / self.n
         out = {}
         for l in self.lags:
             mu_n = self.s_now[l] / self.n
-            C = (self.Craw[l] - self.n * t.outer(mu_n, mu_p)) / self.n
-            out[l] = C.cpu().numpy()
+            C = (self.Craw[l] - self.n * outer(mu_n, mu_p)) / self.n
+            out[l] = C.cpu().numpy() if self.gpu else C
         return out
 
 
