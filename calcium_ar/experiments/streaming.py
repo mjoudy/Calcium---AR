@@ -189,6 +189,7 @@ def stream_moments(
     on_checkpoint=None,
     lags: list[int] | None = None,
     raw_calcium: bool = False,
+    signal: str = "feed",
 ):
     """Stream calcium -> feed in chunks from a *run* BrunelNetwork (densify=False)
     and accumulate moments, snapshotting at each checkpoint (in samples).
@@ -232,6 +233,7 @@ def stream_moments(
     rng = np.random.default_rng(seed)
     f32 = np.float32
 
+    raw_calcium = raw_calcium or (signal == "calcium")   # signal is the modern name
     # multi-lag path (R.8 phase 2): accumulate C(l) at several lags. Leaves the
     # single-lag Cxx/Cyx behaviour identical when lags is None.
     multilag = lags is not None
@@ -277,6 +279,16 @@ def stream_moments(
         if hi > lo:
             np.add.at(spk, (idx[lo:hi].astype(np.intp),
                             (times_samp[lo:hi] - t0).astype(np.intp)), f32(1.0))
+        # signal="spikes": moments on the raw binned spike train (the pre-calcium
+        # best case), for the timing spikes-vs-calcium comparison. Skips the whole
+        # calcium/deconvolution path below.
+        if signal == "spikes":
+            acc.add(spk * f32(amplitude))
+            t0 = t1
+            while ci < len(checkpoints) and t1 >= checkpoints[ci]:
+                _emit(acc, checkpoints[ci], multilag, on_checkpoint, results)
+                ci += 1
+            continue
         # calcium via AR(1) lfilter, carrying state zi across chunks.
         # Noise generation dominates the CPU cost (~1.25e9 draws per chunk at
         # N=12500), so on a device we draw it with the GPU RNG instead:

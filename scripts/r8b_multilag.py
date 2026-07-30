@@ -42,7 +42,9 @@ def main():
     ap.add_argument("--cache-dir", default=str(BASE / "gt_cache"))
     ap.add_argument("--checkpoint-ms", type=float, default=5_000_000.0)
     ap.add_argument("--lags-ms", type=float, nargs="+",
-                    default=[0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 6.0])
+                    default=[0.0, 0.1, 0.3, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 6.0])
+    ap.add_argument("--signal", default="feed", choices=["feed", "calcium", "spikes"],
+                    help="what to build moments on: deconvolved feed / raw calcium / raw spikes")
     ap.add_argument("--chunk-ms", type=float, default=5000.0)
     ap.add_argument("--density", type=float, default=0.10)
     ap.add_argument("--sample", type=int, default=20_000_000)
@@ -84,7 +86,8 @@ def main():
         sigma_intra=cfg["sigma_intra"], sigma_extra=cfg["sigma_extra"],
         smooth_win=smooth_win, tau_method=cfg["tau_method"],
         checkpoints_samples=[cp], chunk_samples=round(args.chunk_ms / dt),
-        seed=1, device=(args.device if args.device == "cuda" else None), lags=lags)
+        seed=1, device=(args.device if args.device == "cuda" else None), lags=lags,
+        signal=args.signal)
     snap = res[cp]                                   # {lag: C(lag) numpy}
     print(f"streamed; mean rate {rate:.1f} Hz")
 
@@ -130,8 +133,9 @@ def main():
     keep = np.arange(P)
     if P > args.keep:
         keep = rng.choice(P, args.keep, replace=False)
-    out = dict(net=args.net, N=N, lags_ms=lags_ms, lag_est_ms=cfg["lag_ms"],
-               delay_ms=cfg["delay"], density=args.density, tau=tau, **profiles,
+    out = dict(net=args.net, N=N, signal=args.signal, lags_ms=lags_ms,
+               lag_est_ms=cfg["lag_ms"], delay_ms=cfg["delay"], density=args.density,
+               tau=tau, **profiles,
                peak_lag_ms=peak_lag_ms[keep].astype(np.float32),
                asym=asym[keep].astype(np.float32),
                a_est=a_est[keep].astype(np.float32),
@@ -140,7 +144,7 @@ def main():
 
     out_dir = Path(args.out_dir) if args.out_dir else (BASE / "results" / "r8b")
     out_dir.mkdir(parents=True, exist_ok=True)
-    fp = out_dir / f"r8b_{args.net}.npz"
+    fp = out_dir / f"r8b_{args.net}_{args.signal}.npz"
     np.savez(fp, **out)
     # quick read-out
     for lab, m in [("true E", pE & yE), ("E false-pos", pE & ynone)]:
