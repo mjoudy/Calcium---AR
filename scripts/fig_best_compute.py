@@ -14,6 +14,11 @@ small views so nothing large travels home:
               random sample of the FULL matrix (same convention as fig_r1). FP and
               FN are the two error types the showcase figure highlights.
 
+With --full-error (small N only, e.g. N=1250), the SAME classification is also run
+on the entire N x N matrix at full resolution (no block-averaging) and saved as
+full_err, and full_gt/full_est become the raw un-averaged matrices too. Skip this
+for large N (e.g. N=12500) — an N x N int8 array stops being "small".
+
 Both are shown in the estimator's orientation (A[i,j] ~ adj.T[i,j]).
 
 Writes <out-dir>/best_<tag>.npz
@@ -48,6 +53,21 @@ def block_mean(M, target=600):
     return Mb, b
 
 
+def classify_errors(true_mat, est_mat, tau):
+    """Per-entry category: 0=TN 1=TP-E 2=TP-I 3=FP 4=FN 5=wrong-sign."""
+    true_sign = np.sign(true_mat)
+    est_sign = np.sign(est_mat)
+    conn = np.abs(est_mat) > tau if tau > 0 else np.abs(est_mat) > 0
+    code = np.zeros(true_mat.shape, dtype=np.int8)
+    code[(true_sign == 0) & conn] = 3                             # FP
+    code[(true_sign != 0) & ~conn] = 4                            # FN
+    hit = (true_sign != 0) & conn & (est_sign == true_sign)
+    code[hit & (true_sign > 0)] = 1                               # TP-E
+    code[hit & (true_sign < 0)] = 2                               # TP-I
+    code[(true_sign != 0) & conn & (est_sign != true_sign)] = 5    # wrong-sign
+    return code
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data", required=True, help="seed dir (A_ols.npy, adj_true.npy)")
@@ -62,6 +82,9 @@ def main():
                      help="target predicted density used to set the error-map threshold tau")
     ap.add_argument("--tau-sample", type=int, default=5_000_000,
                      help="random off-diagonal edges sampled (from the FULL matrix) to fit tau")
+    ap.add_argument("--full-error", action="store_true",
+                     help="also classify the FULL N x N matrix at full resolution "
+                          "(no block-averaging) — small N only, e.g. N=1250")
     ap.add_argument("--out-dir", default=None)
     args = ap.parse_args()
 
@@ -78,8 +101,9 @@ def main():
     sub = np.concatenate([exc[:args.sub_exc], inh[:args.sub_inh]])
     n_exc_sub = min(args.sub_exc, len(exc))
 
-    full_gt, block_factor = block_mean(GT, args.target)
-    full_est, _ = block_mean(A, args.target)
+    full_target = N if args.full_error else args.target   # full_error => b=1, un-averaged
+    full_gt, block_factor = block_mean(GT, full_target)
+    full_est, _ = block_mean(A, full_target)
 
     # --- error map: classify each sub-block entry against a global density
     # threshold tau (same quantile-of-|weight| convention as fig_r1_compute) ---- #
@@ -91,17 +115,8 @@ def main():
 
     sub_gt_full = GT[np.ix_(sub, sub)]
     sub_est_full = A[np.ix_(sub, sub)]
-    true_sign = np.sign(sub_gt_full)
-    est_sign = np.sign(sub_est_full)
-    conn = np.abs(sub_est_full) > tau if tau > 0 else np.abs(sub_est_full) > 0
-
-    sub_err = np.zeros(sub_gt_full.shape, dtype=np.int8)          # 0 = TN
-    sub_err[(true_sign == 0) & conn] = 3                          # FP
-    sub_err[(true_sign != 0) & ~conn] = 4                         # FN
-    hit = (true_sign != 0) & conn & (est_sign == true_sign)
-    sub_err[hit & (true_sign > 0)] = 1                            # TP-E
-    sub_err[hit & (true_sign < 0)] = 2                            # TP-I
-    sub_err[(true_sign != 0) & conn & (est_sign != true_sign)] = 5  # wrong-sign
+    sub_err = classify_errors(sub_gt_full, sub_est_full, tau)
+    full_err = classify_errors(GT, A, tau) if args.full_error else None
 
     # sample individual neurons (2 exc + 2 inh by default) and keep their full
     # outgoing profile (all N targets) — columns are the source convention here
@@ -123,13 +138,18 @@ def main():
                n_exc_full=int((types > 0).sum()),
                sample_idx=sample_idx, sample_is_exc=sample_is_exc,
                sample_est=A[:, sample_idx].T.astype(np.float32))
+    if full_err is not None:
+        out["full_err"] = full_err
 
     out_dir = Path(args.out_dir) if args.out_dir else (BASE / "results" / "best")
     out_dir.mkdir(parents=True, exist_ok=True)
     np.savez(out_dir / f"best_{args.tag}.npz", **out)
     n_fp, n_fn = int((sub_err == 3).sum()), int((sub_err == 4).sum())
-    print(f"N={N}  sub-block {len(sub)} ({n_exc_sub} exc + {len(sub)-n_exc_sub} inh)  "
-          f"tau={tau:.4g}  FP={n_fp}  FN={n_fn}")
+    msg = (f"N={N}  sub-block {len(sub)} ({n_exc_sub} exc + {len(sub)-n_exc_sub} inh)  "
+           f"tau={tau:.4g}  FP={n_fp}  FN={n_fn}")
+    if full_err is not None:
+        msg += f"  full: FP={int((full_err == 3).sum())}  FN={int((full_err == 4).sum())}"
+    print(msg)
     print(f"wrote {out_dir}/best_{args.tag}.npz")
 
 

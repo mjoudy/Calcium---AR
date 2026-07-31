@@ -11,6 +11,13 @@ renders a companion 1x3 "error map" figure — ground truth, inferred (continuou
 and the classification with FP/FN in high-contrast colours against a muted
 background, so the errors are the thing that pops out rather than the raw weights.
 
+And if the compute stage also wrote `full_err` (full-resolution classification of
+the ENTIRE matrix, only run with --full-error, currently N=1250 only), renders a
+(GT, inferred, error) x (full network, sub-block) grid in both orientations:
+<out>_grid2x3 (2 rows x 3 cols) and <out>_grid3x2 (3 rows x 2 cols, transpose). The
+error column/row there is FP/FN only — every other category collapses to
+background, for maximum visual contrast.
+
 Usage:
   python scripts/fig_best_plot.py --data ~/calcium_results/best/best_n12500lr.npz \
       --out figures/fig_best_n12500lr --title "N=12500, 14 Hz AI, OLS"
@@ -33,6 +40,10 @@ import figstyle as fs
 # --- categorical error-map palette: TN/TP muted, FP/FN loud & distinct ---------- #
 ERR_LABELS = ["TN", "TP (E)", "TP (I)", "FP", "FN", "wrong sign"]
 ERR_COLORS = ["#f2f1ec", "#a9c6ea", "#eeb3b0", "#e8890c", "#149e91", "#8b3fa8"]
+
+# --- FP/FN-only palette for the grid figure: everything else is background ----- #
+ERR2_LABELS = ["FP", "FN"]
+ERR2_COLORS = ["#f2f1ec", "#e8890c", "#149e91"]   # [background, FP, FN]
 
 
 def show(fig, ax, M, pct, title, ylabel=None, sub_split=None):
@@ -83,6 +94,73 @@ def plot_error_map(z, out):
     fig.suptitle(f"Error map — sub-block ({z['sub_size']} neurons, exc + inh)",
                  fontsize=13, color=fs.INK, y=0.97)
     fs.save(fig, out)
+
+
+def draw_error_simple(ax, code, sub_split, title=None, ylabel=None):
+    """FP/FN only — every other category (TN/TP/wrong-sign) collapses to
+    background, so the two error types are the only thing visible."""
+    simple = np.zeros_like(code)
+    simple[code == 3] = 1   # FP
+    simple[code == 4] = 2   # FN
+    cmap = ListedColormap(ERR2_COLORS)
+    norm = BoundaryNorm(np.arange(len(ERR2_COLORS) + 1) - 0.5, cmap.N)
+    ax.imshow(simple, cmap=cmap, norm=norm, aspect="equal", interpolation="nearest")
+    if sub_split is not None:
+        for xy in ("axhline", "axvline"):
+            getattr(ax, xy)(sub_split - 0.5, color=fs.INK, lw=0.8, ls=":")
+    ax.set_xticks([]); ax.set_yticks([])
+    if title:
+        ax.set_title(title, fontsize=11)
+    if ylabel:
+        ax.set_ylabel(ylabel, fontsize=12)
+
+
+def plot_grid(z, out):
+    """(GT, inferred, error) x (full network, sub-block) — full-error only,
+    so only small-N runs (N=1250) have both layouts written.
+
+    Two orientations of the same six panels:
+      2x3 : rows = full/sub-block,  cols = GT/inferred/error
+      3x2 : rows = GT/inferred/error,  cols = full/sub-block
+    """
+    if "full_err" not in z.files:
+        return
+    split = int(z["n_exc_sub"])
+    full_gt, full_est, full_err = z["full_gt"], z["full_est"], z["full_err"]
+    sub_gt, sub_est, sub_err = z["sub_gt"], z["sub_est"], z["sub_err"]
+    handles = [mpatches.Patch(color=c, label=l)
+               for c, l in zip(ERR2_COLORS[1:], ERR2_LABELS)]
+    suptitle = f"N={int(z['N'])} — ground truth vs inferred, errors highlighted"
+
+    # --- 2 rows (full, sub-block) x 3 cols (GT, inferred, error) ------------ #
+    fig, ax = plt.subplots(2, 3, figsize=(13, 8.6))
+    fig.subplots_adjust(left=0.05, right=0.98, top=0.9, bottom=0.08,
+                        hspace=0.15, wspace=0.15)
+    show(fig, ax[0, 0], full_gt, 99.5, "ground truth", ylabel="full network")
+    show(fig, ax[0, 1], full_est, 99.5, "inferred")
+    draw_error_simple(ax[0, 2], full_err, None, "error")
+    show(fig, ax[1, 0], sub_gt, 99, "", ylabel="sub-block")
+    show(fig, ax[1, 1], sub_est, 99, "")
+    draw_error_simple(ax[1, 2], sub_err, split)
+    fig.legend(handles=handles, loc="lower center", ncol=2, frameon=False,
+               bbox_to_anchor=(0.5, 0.0), fontsize=9.5)
+    fig.suptitle(suptitle, fontsize=13, color=fs.INK, y=0.97)
+    fs.save(fig, f"{out}_grid2x3")
+
+    # --- 3 rows (GT, inferred, error) x 2 cols (full, sub-block) ------------ #
+    fig, ax = plt.subplots(3, 2, figsize=(9, 12.4))
+    fig.subplots_adjust(left=0.07, right=0.97, top=0.93, bottom=0.06,
+                        hspace=0.15, wspace=0.15)
+    show(fig, ax[0, 0], full_gt, 99.5, "full network", ylabel="ground truth")
+    show(fig, ax[0, 1], sub_gt, 99, "sub-block", sub_split=split)
+    show(fig, ax[1, 0], full_est, 99.5, "", ylabel="inferred")
+    show(fig, ax[1, 1], sub_est, 99, "", sub_split=split)
+    draw_error_simple(ax[2, 0], full_err, None, ylabel="error")
+    draw_error_simple(ax[2, 1], sub_err, split)
+    fig.legend(handles=handles, loc="lower center", ncol=2, frameon=False,
+               bbox_to_anchor=(0.5, 0.0), fontsize=9.5)
+    fig.suptitle(suptitle, fontsize=13, color=fs.INK, y=0.97)
+    fs.save(fig, f"{out}_grid3x2")
 
 
 def show_entries_bar(ax, vals, title):
@@ -152,6 +230,7 @@ def main():
         plot_sample_entries(z, f"{args.out}_entries")
 
     plot_error_map(z, f"{args.out}_errors")
+    plot_grid(z, args.out)
 
 
 if __name__ == "__main__":
