@@ -175,19 +175,54 @@ def main():
         print(f"  {name:14s} n_tp={int(tp.sum()):7d} n_fp={int(fp.sum()):7d} "
               f"E-precision={prec:.3f}  FP mean|A|={fp_mean:.4g} med={fp_med:.4g}  "
               f"TP mean|A|={tp_mean:.4g}")
-        return dict(n_tp=int(tp.sum()), n_fp=int(fp.sum()), precision=float(prec),
-                    fp_mean=float(fp_mean), fp_median=float(fp_med), tp_mean=float(tp_mean))
+        stats = dict(n_tp=int(tp.sum()), n_fp=int(fp.sum()), precision=float(prec),
+                     fp_mean=float(fp_mean), fp_median=float(fp_med), tp_mean=float(tp_mean))
+        return stats, tp, fp
 
     print(f"\n--- false-positive comparison (signal={args.signal}, "
           f"L[0]={L[0]}ms, joint predictors={L}) ---")
-    r_single = report("single-lag", A_single)
-    r_joint = report("joint multi-lag", A_joint_L1)
+    r_single, tp_single, fp_single = report("single-lag", A_single)
+    r_joint, tp_joint, fp_joint = report("joint multi-lag", A_joint_L1)
+
+    # -------- is the improvement specifically about shared input? -------- #
+    # 1-hop common-presynaptic-driver count for every sampled pair (i,j), same
+    # construction as fig_way2.py / fig_way2_motifs.py, computed once from the
+    # already-loaded ground-truth adjacency (cheap: boolean matmul at N=1250).
+    Bfull = (adj != 0)
+    driver_count = (Bfull[:, i] & Bfull[:, j]).sum(0)            # shared over full N
+
+    fixed = fp_single & ~fp_joint      # was a false positive, joint no longer flags it
+    persisted = fp_single & fp_joint   # false positive under both
+    new_tp = tp_joint & ~tp_single     # newly gained true positives (sanity check)
+
+    def dc_stats(mask, label):
+        n = int(mask.sum())
+        if n == 0:
+            print(f"  {label:34s} n=0"); return dict(n=0, mean=float("nan"), median=float("nan"))
+        m, med = float(driver_count[mask].mean()), float(np.median(driver_count[mask]))
+        print(f"  {label:34s} n={n:7d}  mean driver_count={m:.2f}  median={med:.1f}")
+        return dict(n=n, mean=m, median=med)
+
+    print(f"\n--- shared-driver exposure: is the fix specifically about shared input? ---")
+    dc_all_fp = dc_stats(fp_single, "ALL single-lag false positives")
+    dc_fixed = dc_stats(fixed, "  -> FIXED by joint estimator")
+    dc_persisted = dc_stats(persisted, "  -> PERSISTED under joint estimator")
+    dc_new_tp = dc_stats(new_tp, "newly-gained true positives (sanity check)")
+    if dc_fixed["n"] and dc_persisted["n"]:
+        print(f"\n  fixed/persisted mean driver_count ratio: "
+              f"{dc_fixed['mean']/max(dc_persisted['mean'],1e-9):.2f}x "
+              f"(>1 means the fix IS concentrated on high-shared-input false positives)")
 
     out = dict(net=args.net, N=N, signal=args.signal, lags_ms=np.array(L),
                density=args.density, checkpoint_ms=ckpt_ms,
                single_precision=r_single["precision"], joint_precision=r_joint["precision"],
                single_fp_mean=r_single["fp_mean"], joint_fp_mean=r_joint["fp_mean"],
-               single_fp_median=r_single["fp_median"], joint_fp_median=r_joint["fp_median"])
+               single_fp_median=r_single["fp_median"], joint_fp_median=r_joint["fp_median"],
+               dc_fixed_n=dc_fixed["n"], dc_fixed_mean=dc_fixed["mean"], dc_fixed_median=dc_fixed["median"],
+               dc_persisted_n=dc_persisted["n"], dc_persisted_mean=dc_persisted["mean"],
+               dc_persisted_median=dc_persisted["median"],
+               dc_new_tp_n=dc_new_tp["n"], dc_new_tp_mean=dc_new_tp["mean"],
+               dc_all_fp_mean=dc_all_fp["mean"])
     out_dir = Path(args.out_dir) if args.out_dir else (BASE / "results" / "multilag")
     out_dir.mkdir(parents=True, exist_ok=True)
     fp_path = out_dir / f"multilag_{args.net}_{args.signal}.npz"
