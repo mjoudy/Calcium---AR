@@ -6,14 +6,21 @@ each with two measures (ROC-AUC + correlation), at a FIXED recording length so
 differences reflect the OBSERVATION, not the amount of data:
 
   spikes        : regress on binned spike counts (no calcium) — the ceiling
-  deconv_tau    : calcium (sweep dye tau) -> deconvolve      -> feed
-  deconv_rate   : calcium -> downsample (sweep camera dt)    -> deconvolve -> feed
-  raw_tau       : calcium (sweep tau), NO deconvolution
-  raw_rate      : calcium -> downsample (sweep dt), NO deconvolution
+  deconv_tau    : dye tau swept, camera FIXED at FIXED_CAM_MS -> deconvolve -> feed
+  deconv_rate   : camera dt swept, dye tau FIXED at FIXED_TAU_MS -> deconvolve -> feed
+  raw_tau       : dye tau swept, camera FIXED,  NO deconvolution
+  raw_rate      : camera dt swept, dye tau FIXED, NO deconvolution
 
-The tau- and rate-swept curves share the x-axis dt/tau (the calcium "blur"): if
-only the ratio matters they overlap; the camera (rate) curve may sit lower
-because a slower camera also loses frames and merges spikes.
+Two physically distinct knobs, swept ONE AT A TIME (tau = dye/indicator decay
+kinetics; camera dt = recording sampling interval) rather than collapsed onto a
+shared dt/tau ratio axis — a combined ratio axis makes it impossible to tell
+which physical change (dye vs. camera) is driving a given point. Each sweep
+also still records eff_dt/tau so the "does only the ratio matter?" collapse
+can be plotted separately (fig_r2_plot.py's secondary panel) for those who
+want it, without it being the primary read.
+
+Ranges are pushed past the previous endpoints on both sweeps so the curves
+visibly reach their floor/plateau instead of stopping mid-slope.
 
 Writes a small r2_data.npz (KB). Reuses cached spikes via --cache-dir if present.
 
@@ -44,6 +51,12 @@ from wrapup_run import build_cfg
 LAG_MS = 2.0
 SMOOTH_MS = 3.1
 AMP, SIG_IN, SIG_EX = 1.0, 0.01, 0.05
+
+# Fixed value held constant on the OTHER sweep, so each sweep changes exactly
+# one physical knob at a time:
+FIXED_TAU_MS = 100.0   # dye decay used while sweeping camera rate
+FIXED_CAM_MS = 33.0    # ~30 Hz camera used while sweeping dye tau (typical
+                        # calcium-imaging frame rate; not an infinitely-fast camera)
 
 
 def smooth_win(eff_dt):
@@ -125,23 +138,35 @@ def accumulate(feed_iter, N, lag):
 
 
 def run(kind, param, idx, tms, N, dt, adj, T_ms, chunk, rng_seed):
+    """Returns (x_native, x_ratio, auc, corr).
+
+    x_native is the ONE physical quantity this sweep actually varies (camera
+    frame interval in ms for a rate sweep, dye tau in ms for a tau sweep) —
+    the primary, single-variable x-axis. x_ratio = eff_dt/tau is kept
+    alongside it only for the secondary "does the ratio alone explain it?"
+    collapse view.
+    """
     rng = np.random.default_rng(rng_seed)
     if kind == "spikes":
         eff_dt = param; lag = max(1, round(LAG_MS / eff_dt))
         Cxx, Cyx = accumulate(iter_spike_bin(idx, tms, N, param, T_ms, chunk), N, lag)
-        x = param
+        x_native = param; x_ratio = param
     else:
         deconv = kind.startswith("deconv")
         if kind.endswith("tau"):
-            tau = param; frame_ms = None; eff_dt = dt
-        else:                                          # rate sweep, tau fixed 100
-            tau = 100.0; frame_ms = param; eff_dt = param
+            # camera held FIXED at a realistic (not infinitely-fast) rate,
+            # so we can sweep tau both above and below the camera's own dt.
+            tau = param; frame_ms = FIXED_CAM_MS; eff_dt = FIXED_CAM_MS
+            x_native = tau
+        else:                                          # rate sweep, tau FIXED
+            tau = FIXED_TAU_MS; frame_ms = param; eff_dt = param
+            x_native = frame_ms
         lag = max(1, round(LAG_MS / eff_dt))
         Cxx, Cyx = accumulate(
             iter_calcium(idx, tms, N, dt, tau, T_ms, deconv, frame_ms, chunk, rng), N, lag)
-        x = eff_dt / tau
+        x_ratio = eff_dt / tau
     auc, corr = score(Cxx, Cyx, adj)
-    return x, auc, corr
+    return x_native, x_ratio, auc, corr
 
 
 def main():
@@ -151,11 +176,16 @@ def main():
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--chunk", type=int, default=20000, help="frames per chunk")
     ap.add_argument("--taus", type=float, nargs="+",
-                    # spans dt/tau = 0.1 .. 0.000125 (dt=0.1), so the dye sweep
-                    # overlaps the camera sweep across the whole x-axis
-                    default=[1, 2, 5, 10, 25, 50, 100, 200, 400, 800])
+                    # camera fixed at FIXED_CAM_MS=33: values below 33 cross into
+                    # "dye decays faster than the camera can see" territory;
+                    # values up to 1600 extend into "very slow, over-smoothed
+                    # dye" territory, so both ends of the curve reach a plateau.
+                    default=[0.5, 1, 2, 5, 10, 20, 50, 100, 200, 400, 800, 1600])
     ap.add_argument("--frames", type=float, nargs="+",
-                    default=[0.1, 0.5, 1, 2, 5, 10, 20, 33])
+                    # tau fixed at FIXED_TAU_MS=100: extended past 33 out to
+                    # 1000 ms (~1 fps) so the curve visibly bottoms out instead
+                    # of stopping mid-slope.
+                    default=[0.1, 0.5, 1, 2, 5, 10, 20, 33, 50, 100, 200, 500, 1000])
     ap.add_argument("--spike-bins", type=float, nargs="+",
                     default=[0.5, 1, 2, 5, 10, 20, 50])
     ap.add_argument("--out", required=True)
@@ -180,15 +210,18 @@ def main():
             + [("deconv_rate", f) for f in args.frames]
             + [("raw_rate", f) for f in args.frames])
     for kind, p in plan:
-        x, auc, corr = run(kind, p, idx, tms, N, dt, adj, args.T_ms, args.chunk, args.seed)
-        out[kind].append((x, auc, corr))
-        print(f"  {kind:12s} param={p:<6g} x={x:.4g}  AUC={auc:.3f}  corr={corr:.3f}",
-              flush=True)
+        x_native, x_ratio, auc, corr = run(
+            kind, p, idx, tms, N, dt, adj, args.T_ms, args.chunk, args.seed)
+        out[kind].append((x_native, x_ratio, auc, corr))
+        print(f"  {kind:12s} param={p:<6g} x={x_native:.4g}  "
+              f"(dt/tau={x_ratio:.4g})  AUC={auc:.3f}  corr={corr:.3f}", flush=True)
 
-    save = dict(net=args.net, N=N, T_ms=args.T_ms)
+    save = dict(net=args.net, N=N, T_ms=args.T_ms,
+                fixed_tau_ms=FIXED_TAU_MS, fixed_cam_ms=FIXED_CAM_MS)
     for k, v in out.items():
         arr = np.array(sorted(v))
-        save[f"{k}_x"], save[f"{k}_auc"], save[f"{k}_corr"] = arr[:, 0], arr[:, 1], arr[:, 2]
+        save[f"{k}_x"], save[f"{k}_ratio"] = arr[:, 0], arr[:, 1]
+        save[f"{k}_auc"], save[f"{k}_corr"] = arr[:, 2], arr[:, 3]
     np.savez(args.out, **save)
     print(f"\nwrote {args.out}")
 
