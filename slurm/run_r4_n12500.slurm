@@ -3,9 +3,13 @@
 # (g=8, J=0.150, eta=2.60, V_reset=10  ->  13.9 Hz, CV 1.06, synchrony 0.007).
 #
 # Its own job because it is the expensive one: ONE 5M-ms simulation, scored at
-# the matched T/N = 800 / 1600 / 4000 checkpoints (1M / 2M / 5M ms). Each
-# checkpoint is solved and SAVED as it is reached, so a timeout still leaves the
-# shorter recordings on disk.
+# SIX checkpoints (100k/200k/500k/1M/2M/5M ms) so this line spans the full
+# fig_R4 x-axis, matching N=1250/2500/5000's grid. Each checkpoint is solved
+# and SAVED as it is reached, so a timeout still leaves the shorter recordings
+# on disk. The 3 new short checkpoints (100k/200k/500k) are CHEAP to add: the
+# ground-truth cache key is keyed on max(sweep)=5,000,000ms, unchanged from
+# before, so this reuses the existing cached simulation instead of resimulating
+# -- see the "cache reuse" note in scripts/wrapup_run_stream.py.
 #
 # NOTE this replaces the reuse of wrapup_n12500lr (g=6, J=0.1): that run is a
 # different regime family (CV 0.62) and is no longer part of this ladder. It
@@ -55,12 +59,12 @@ echo "=== regime preflight: N=12500, g=8, J x1.5, eta=2.60 ==="
       --etas 2.6 --target 14 --n-threads "${SLURM_CPUS_PER_TASK}" || true
 
 "$PY" scripts/wrapup_run_stream.py --net n12500_r4 \
-      --sweep 1000000 2000000 5000000 --seeds 1 \
+      --sweep 100000 200000 500000 1000000 2000000 5000000 --seeds 1 \
       --methods ols --device cuda --chunk-ms 5000 \
       --cache-dir "$WS/gt_cache" --save-moments
 
 # score on the cluster; only the small metrics.csv files travel home
-for Tk in 1000 2000 5000; do
+for Tk in 100 200 500 1000 2000 5000; do
     "$PY" scripts/analyze_run.py --data "$WS/results/wrapup_n12500r4_T${Tk}k" \
         || echo "analyze T${Tk}k failed (continuing)"
 done

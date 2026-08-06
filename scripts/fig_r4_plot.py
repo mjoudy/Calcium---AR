@@ -2,10 +2,11 @@
 R.4 (data length x network size) — the scaling law, plotted LOCALLY.
 
 Reads the small metrics.csv files produced on the cluster (one per size x
-recording length) and draws:
-
-    left  column : measure vs recording length      -> bigger N needs more data
-    right column : measure vs T/N (samples/neuron)  -> the curves COLLAPSE
+recording length) and draws one column: measure vs recording length -> bigger
+N needs more data. (The "vs T/N, curves collapse" column was dropped per
+professor's feedback — it was somewhat trivially built-in by the sweep design,
+matched samples-per-neuron ratios at every N, rather than a discovered
+collapse.)
 
 rows = correlation and excitatory recall (the two measures with dynamic range;
 ROC-AUC saturates and squashes the collapse against the ceiling).
@@ -77,25 +78,19 @@ def main():
         raise SystemExit(f"no metrics.csv found under {args.root}")
     colors = plt.cm.viridis(np.linspace(0.15, 0.85, len(data)))
 
-    fig, axes = plt.subplots(len(MEASURES), 2, figsize=(12.5, 8), squeeze=False)
-    fig.subplots_adjust(left=0.08, right=0.98, top=0.89, bottom=0.09,
-                        hspace=0.30, wspace=0.24)
+    fig, axes = plt.subplots(len(MEASURES), 1, figsize=(7, 8), squeeze=False)
+    fig.subplots_adjust(left=0.13, right=0.97, top=0.89, bottom=0.09,
+                        hspace=0.30)
 
     for r, (key, label) in enumerate(MEASURES):
+        ax = axes[r][0]
         for (N, (T, vals)), c in zip(sorted(data.items()), colors):
-            axes[r][0].plot(T, vals[key], "o-", color=c, lw=1.9, ms=6,
-                            label=f"N = {N}")
-            axes[r][1].plot((T / DT) / N, vals[key], "o-", color=c, lw=1.9, ms=6)
-        for col, xlab in enumerate(["recording length (ms)",
-                                    "samples per neuron   T / N"]):
-            ax = axes[r][col]
-            ax.set_xscale("log")
-            ax.set(xlabel=xlab, ylabel=label, ylim=(0, 1.02))
-            ax.grid(True, color=fs.GRID, lw=0.6); ax.set_axisbelow(True)
-            fs.despine(ax)
+            ax.plot(T, vals[key], "o-", color=c, lw=1.9, ms=6, label=f"N = {N}")
+        ax.set_xscale("log")
+        ax.set(xlabel="recording length (ms)", ylabel=label, ylim=(0, 1.02))
+        ax.grid(True, color=fs.GRID, lw=0.6); ax.set_axisbelow(True)
+        fs.despine(ax)
     axes[0][0].legend(fontsize=9, loc="lower right")
-    axes[0][0].set_title("bigger networks need longer recordings")
-    axes[0][1].set_title("...but collapse onto samples per neuron")
 
     title = args.title or ("Scaling: recovery is set by data per neuron "
                            "(matched AI regime, ~14 Hz, OLS)")
