@@ -1,11 +1,11 @@
 """
 Effect of preprocessing — PLOT (local), consistent style.
 
-    left  : metric comparison, raw calcium vs deconvolved feed (corr, AUC_E,
-            excitatory recall).
-    right : class-conditional CDFs of |inferred weight| for the deconvolved feed —
-            how well excitatory / inhibitory separate from unconnected (CDF, not
-            log-hist, per the professor's preference).
+    left     : metric comparison, raw calcium vs deconvolved feed (corr, AUC_E,
+               excitatory recall).
+    right x3 : per-class |inferred weight| PDFs (raw vs feed, one panel per
+               class) — how deconvolution shifts each class's weight
+               distribution relative to the unconnected baseline.
 
 Usage:
   python scripts/fig_preproc_plot.py --data ~/calcium_results/preproc/preproc_n1250r4.npz \
@@ -25,10 +25,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import figstyle as fs
 
 
-def cdf(v):
-    return np.sort(v), np.linspace(0, 1, len(v))
-
-
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data", required=True)
@@ -39,8 +35,9 @@ def main():
     z = np.load(args.data, allow_pickle=False)
     N = int(z["N"])
 
-    fig, ax = plt.subplots(1, 2, figsize=(13, 5.2))
-    fig.subplots_adjust(left=0.07, right=0.98, top=0.86, bottom=0.14, wspace=0.24)
+    fig, ax = plt.subplots(1, 4, figsize=(19, 5.2),
+                           gridspec_kw={"width_ratios": [1.3, 1, 1, 1]})
+    fig.subplots_adjust(left=0.045, right=0.985, top=0.86, bottom=0.14, wspace=0.32)
 
     # left: metrics raw vs feed
     keys = [("corr", "correlation"), ("auc_E", "AUC excitatory"),
@@ -49,7 +46,7 @@ def main():
     raw = [float(z[f"raw_{k}"]) for k, _ in keys]
     feed = [float(z[f"feed_{k}"]) for k, _ in keys]
     ax[0].bar(x - w/2, raw, w, color=fs.C_NONE, label="raw calcium")
-    ax[0].bar(x + w/2, feed, w, color=fs.C_E, label="deconvolved feed")
+    ax[0].bar(x + w/2, feed, w, color=fs.C_E, label="deconvolved")
     for xi, (r, f) in enumerate(zip(raw, feed)):
         ax[0].text(xi - w/2, r + 0.01, f"{r:.2f}", ha="center", va="bottom", fontsize=8.5)
         ax[0].text(xi + w/2, f + 0.01, f"{f:.2f}", ha="center", va="bottom", fontsize=8.5)
@@ -57,22 +54,30 @@ def main():
     ax[0].set(ylabel="score", ylim=(0, 1.05))
     ax[0].grid(True, axis="y", color=fs.GRID, lw=0.6); ax[0].set_axisbelow(True)
     fs.despine(ax[0]); ax[0].legend(fontsize=9, loc="upper right")
-    ax[0].set_title("recovery: raw calcium vs deconvolved feed")
+    ax[0].set_title("recovery: raw calcium vs deconvolved")
 
-    # right: class-conditional |weight| CDFs for the feed
-    for cls, lab, col in [("E", "excitatory edges", fs.C_E),
-                          ("I", "inhibitory edges", fs.C_I),
-                          ("none", "unconnected", fs.C_NONE)]:
-        key = f"feed_{cls}"
-        if key in z.files and len(z[key]):
-            xv, yv = cdf(z[key])
-            ax[1].plot(xv, yv, color=col, lw=2, label=lab)
-    ax[1].set(xlabel="|inferred weight|  (normalised)", ylabel="cumulative fraction",
-              ylim=(0, 1))
-    ax[1].set_xlim(left=0)
-    ax[1].grid(True, color=fs.GRID, lw=0.6); ax[1].set_axisbelow(True); fs.despine(ax[1])
-    ax[1].legend(fontsize=9, loc="lower right")
-    ax[1].set_title("weight separation by class (deconvolved feed)")
+    # right 3 panels: per-class |weight| PDFs, raw (light) vs feed (dark) —
+    # small multiples so the shift from deconvolution reads directly as a
+    # peak moving right / narrowing, one class at a time instead of 6
+    # overlapping CDF lines.
+    for k, (cls, lab, col) in enumerate([("E", "excitatory", fs.C_E),
+                                         ("I", "inhibitory", fs.C_I),
+                                         ("none", "unconnected", fs.C_NONE)]):
+        axp = ax[k + 1]
+        feed, raw = z[f"feed_{cls}"], z[f"raw_{cls}"]
+        vmax = np.percentile(np.concatenate([feed, raw]), 99)
+        bins = np.linspace(0, vmax, 36)
+        axp.hist(raw, bins=bins, density=True, color=col, alpha=0.35,
+                 label="raw")
+        axp.hist(feed, bins=bins, density=True, color=col, alpha=0.85,
+                 histtype="step", lw=2.2, label="deconvolved")
+        axp.set_title(lab, fontsize=10.5)
+        axp.set_xlabel("|inferred weight|", fontsize=8.5)
+        if k == 0:
+            axp.set_ylabel("density")
+        axp.grid(True, color=fs.GRID, lw=0.6); axp.set_axisbelow(True)
+        fs.despine(axp)
+        axp.legend(fontsize=8)
 
     fig.suptitle(f"Effect of preprocessing at N={N}: deconvolution and edge "
                  "recovery",
