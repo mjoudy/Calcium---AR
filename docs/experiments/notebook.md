@@ -27,6 +27,8 @@ One line per parameter. Updated as evidence comes in. "—" = not yet tested.
 | `sim_time` (T) | **Split result.** Precision & Pearson still *rising* at 50 k (variance-limited → regularization can help). But the E/I ratio *worsens* toward ~0.3 with more data (bias-limited → regularization can't fix it; needs post-processing). | more data still helps precision | 2026-06-18 |
 | `sigma_extra` (noise) | **small effect at the optimum** — recording noise costs only ~0.02 Pearson (0.370 → 0.353) | minor | 2026-06-18 |
 | input stage (spikes vs calcium) | **Calcium is not the bottleneck**, but preprocessing is still needed. Preprocessed feed recovers ~95 % of spike-level Pearson. RAW calcium (no prep) gives a *higher but fake* Pearson (0.48) with worse AUC/type/precision — prep removes that confound. | preprocess (don't skip) | 2026-06-18 |
+| camera frame rate (R.2, dye τ vs camera dt, swept separately) | **Deconvolution trades noise for rank.** At a fast camera (dt≲2ms) deconvolved AUC > raw, but deconvolved *correlation* < raw — differentiation amplifies noise fastest exactly when frames are close together. Crosses over (deconv wins both) around dt≈5–10ms. Every other figure in the project (R.1/4/5/7/8) implicitly assumes an infinitely-fast camera (dt=0.1ms, no downsampling) — R.2 is the only place a realistic frame rate is modeled at all. | slow enough camera (≳5–10ms) for deconvolution to pay off on magnitude too | 2026-08-06 |
+| network size N (R.4, full 6-point T grid: 100k–5000k ms, every N) | **Correlation converges with N; excitatory recall does NOT.** At matched *absolute* recording length (not just matched T/N), all 4 sizes' correlation converges to ~0.8–0.85 by T=5M ms — more data closes most of the gap. Excitatory recall does not converge: N=1250 reaches ~0.77, N=12500 only ~0.46, at the SAME recording length. Confirms the R.7/R.8 shared-input-confounding finding is structural (scales with in-degree C_E=ε·N, fixed ε=0.1), not a data-amount artifact — see [[shared_input_findings.md]]. | more data helps correlation broadly; does not fix excitatory recall at large N | 2026-08-07 |
 
 ---
 
@@ -51,6 +53,11 @@ One line per parameter. Updated as evidence comes in. "—" = not yet tested.
   detector would unlock the fully-unsupervised regularize→rescale pipeline.
 - NEW: can we estimate g (the E/I weight ratio) from the data (e.g. network balance) so
   the unsupervised rescale can target the true 5, not just equalise to 1?
+- NEW (R.2, 2026-08-06): does widening the Savitzky-Golay smoothing window (or lowering
+  polyorder) at fast camera rates fix the deconvolved-correlation deficit? Plausible
+  (derivative noise gain shrinks with window length; τ=100ms leaves lots of room before
+  a wider window would blur real dynamics) but not yet tested — needs a small SMOOTH_MS/
+  polyorder sub-sweep at dt≲2ms.
 
 ---
 
@@ -67,6 +74,135 @@ which params were held fixed.
 **Conclusion:** the plain-language takeaway — the sentence you'll want in a week.
 **Next:** follow-up ideas.
 -->
+
+### 2026-08-07 — R.4 extended to a full 6-point T grid; excitatory recall doesn't converge with N
+
+**Question:** Professor's feedback on fig_R4: (1) drop the right "vs T/N, curves
+collapse" column — it was a somewhat trivial consequence of the sweep design
+(every N tested at matched T/N=800/1600/4000, so of course those points line
+up); (2) each N's line only covered a narrow, disjoint slice of the "vs
+recording length" x-axis (e.g. N=1250: 100k–500k ms; N=12500: 1000k–5000k ms) —
+add more points so all 4 lines stretch across the full axis.
+
+**Setup:** N=1250/2500/5000/12500, matched AI regime (~14Hz, CV~1.0, g=8,
+V_reset=10, J·√C_E=4.743, per-N eta). Extended every size to the shared grid
+T=100k/200k/500k/1M/2M/5M ms. N=12500 was cheap to extend (cached ground truth,
+same max_T=5M already simulated — just added 3 more checkpoints). N=1250/2500/
+5000 each needed a fresh full resimulation up to the new 5M ms max (longer than
+their old max, so the ground-truth cache key changed). 4 separate SLURM jobs
+(`slurm/run_r4_n12500.slurm` + 3 new `run_r4_n{1250,2500,5000}_extend.slurm`),
+all completed same night (16min–2h each, well inside budget). Plot:
+`scripts/fig_r4_plot.py` → `figures/fig_R4` (now single column, no collapse
+panel).
+
+**Result:**
+1. **Correlation converges with N.** At matched absolute T (not just matched
+   T/N), all 4 sizes climb toward ~0.8–0.85 by T=5M ms — the size gap seen at
+   short T mostly closes with enough data.
+2. **Excitatory recall does NOT converge.** At the same T=5M ms: N=1250≈0.77,
+   N=2500≈0.70, N=5000≈0.60, N=12500≈0.46 — a clean, monotonic, persistent gap
+   by size that more data does not close.
+
+**Conclusion:** this is the same shared-input-confounding mechanism already
+established in R.7/R.8 ([[shared_input_findings.md]]), now shown to be
+structural rather than a data-amount effect: fixed connection probability
+(ε=0.1) means in-degree C_E=ε·N_E scales with N, so bigger networks have
+proportionally more shared common input per neuron regardless of recording
+length. Correlation (dominated by inhibition + overall fit) isn't very
+sensitive to this and converges; excitatory-specific recall is directly capped
+by it and doesn't. Report implication: don't present "more data fixes
+everything" — split the claim by metric.
+
+**Next:** none planned; this closes out the "does more data fix the N-scaling
+gap" question definitively (no, not for excitatory recall). Could check if the
+excitatory-recall gap scales cleanly with C_E specifically (linear? sqrt?) if
+useful for the report.
+
+---
+
+### 2026-08-06 — R.2 restructured: dye τ and camera rate swept one at a time (not as a ratio)
+
+**Question:** R.2 originally collapsed two different physical knobs — dye decay
+time constant τ (a property of the calcium indicator) and camera frame interval
+dt (a property of the recording setup) — onto one shared `dt/τ` "blur" x-axis, to
+test whether only the ratio matters. Professor's feedback: this makes it
+impossible to tell which physical change is driving a given point; vary one at a
+time instead. Separately: why is R.2's correlation so much lower than the
+equivalent figure in the 2021 thesis presentation (page 15, "Effect of time
+constant")?
+
+**Setup:** N=1250, `n1250ai` regime (g=8, η=1, J_ex=0.8, ~8Hz AI), T=100k ms fixed
+recording length (deliberately short — R.2 isolates the *observation* effect from
+the *amount of data* effect). Two sweeps run separately, each holding the other
+knob fixed:
+  - **camera-rate sweep**: dye τ fixed at 100ms, camera frame interval swept
+    0.1–1000ms.
+  - **dye-τ sweep**: camera fixed at a realistic 33ms (~30Hz, not an idealized
+    infinite-speed camera), τ swept 0.5–1600ms.
+Both compare `raw` vs `deconvolved` (Savitzky-Golay smooth+derivative,
+`SMOOTH_MS=3.1`, `polyorder=3` fixed, window widens automatically once camera dt
+pushes the sample-count floor). Scripts: `scripts/fig_r2_compute.py` (compute,
+ran on cluster) → `scripts/fig_r2_plot.py` (plot, local). Output:
+`figures/fig_R2` (primary, one-variable-at-a-time) + `figures/fig_R2_ratio`
+(secondary collapse view, kept for reference only).
+
+**Result:**
+1. **Camera rate matters more than τ in this regime.** AUC/corr both fall
+   steadily as the camera slows past ~5ms and bottom out near chance by ~100ms+
+   (both raw and deconvolved). The τ sweep (camera fixed) is much flatter —
+   AUC/corr barely move across 0.5–1600ms once the camera itself is the
+   bottleneck.
+2. **Deconvolution helps AUC but hurts correlation at fast camera rates**, and
+   flips to helping both past dt≈5–10ms. Numbers (dt=0.1→10ms): deconv AUC
+   0.81→0.62 vs raw AUC 0.70→0.61 (deconv wins throughout); deconv corr
+   0.43→0.43 (dips to 0.35 at dt=1) vs raw corr 0.55→0.43 (raw wins until the
+   crossover). Mechanism: deconvolution = smoothing + numerical derivative;
+   differentiation amplifies noise, worst when frames are close together
+   because the real signal barely changes between adjacent samples while sensor
+   noise doesn't shrink. AUC (rank-based) survives that noise much better than
+   Pearson correlation does.
+3. **The R.2 vs 2021-thesis correlation gap is NOT about tau/dt** — it's an
+   apples-to-oranges setup difference. Found the actual 2021 config
+   (`_arxiv/scripts-hpc/dask_pipeline/network_config.json`): g=6/η=2, **J=8.0**
+   (current: J_ex=0.8, 10× weaker), **sim_length=1,000,000ms** (current: 100k ms,
+   10× less data). Proof it's not the calcium manipulation: the spikes-only
+   reference curve (no calcium involved at all) also collapsed, from
+   AUC≈0.99/corr≈0.85–0.9 (2021) to AUC≈0.78/corr≈0.54 (now) — same gap, zero
+   calcium effect, so the cause is the weaker synapses + 10× less data, not
+   anything R.2 tests.
+4. **R.2 is the only figure in the whole project that models a realistic camera
+   at all.** Checked `calcium_ar/simulation/calcium_signal.py`, `wrapup_run.py`,
+   all preprocessing code — zero mentions of downsampling/frame rate anywhere
+   else. Every other figure (R.1/4/5/7/8, wrapup) implicitly assumes an
+   infinitely-fast camera (dt=0.1ms, no downsampling step at all). Their
+   headline recovery numbers are therefore best-case relative to a real ~30Hz
+   camera.
+
+**Conclusion:** the one-variable-at-a-time restructuring plus the extended
+ranges (past the old endpoints, so curves visibly reach their floor) shows
+camera rate is the dominant limiting factor in this regime, not dye kinetics.
+Deconvolution is a rank-order tool more than a magnitude-recovery tool at fast
+frame rates — worth stating carefully in the report rather than claiming
+deconvolution is unconditionally better. The low absolute correlation numbers
+vs. the 2021 thesis are a data-amount/coupling-strength artifact, not a finding
+about calcium observation — don't compare the two directly without matching
+setups.
+
+**Next:** (a) small SMOOTH_MS/polyorder sub-sweep to test whether a wider
+smoothing window recovers deconvolved correlation at fast camera rates
+(hypothesis: yes, since τ=100ms leaves lots of room before a wider window would
+blur real dynamics — not yet tested); (b) optionally rerun R.2 with the 2021
+config (stronger synapses, longer recording) for a true like-for-like
+comparison, if the report needs one.
+
+**Addendum (same day):** trimmed the primary `figures/fig_R2` down to 2 columns
+(camera rate | binned-spikes reference) — the dye-τ column was flat/uninformative
+next to the camera panel in this regime and crowded the main read. The τ panel
+(finding #2 above still holds) now lives in its own appendix figure,
+`figures/fig_R2_tau`, so nothing is lost — just demoted out of the headline
+figure. `figures/fig_R2_ratio` (the dt/τ collapse view) unchanged.
+
+---
 
 ### 2026-06-22 — Dale-regularization candidates: does anything beat hard in-solver Dale?
 **Question:** Can soft Dale, iterative type-refinement, EM-soft, or a no-guess
