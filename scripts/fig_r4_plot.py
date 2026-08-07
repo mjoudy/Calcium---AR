@@ -49,24 +49,36 @@ MEASURES = [("corr", "correlation"), ("E_rec", "excitatory recall"),
 
 
 def load(root: Path, method="ols"):
-    """-> {N: (T_ms[], {measure: values[]})}"""
+    """-> {N: (T_ms[], {measure: (mean[], std[], n_seeds[])})}
+
+    Aggregates across every seed<k>/ row in metrics.csv at each recording
+    length (analyze_run.py already writes one row per seed x method, so this
+    is just grouping + mean/std -- no new compute needed). n_seeds=1 -> std=0,
+    so old single-seed data still plots fine, just without visible error bars.
+    """
     out = {}
     for N, prefix in LADDER:
-        pts = []
+        by_T = {}
         for d in sorted(root.glob(f"{prefix}*k")):
             f = d / "metrics.csv"
             if not f.exists():
                 continue
             T_ms = float(d.name.rsplit("_T", 1)[1].rstrip("k")) * 1000.0
+            bucket = by_T.setdefault(T_ms, {k: [] for k, _ in MEASURES})
             with open(f) as fh:
                 for row in csv.DictReader(fh):
                     if row["method"] == method:
-                        pts.append((T_ms, {k: float(row[k]) for k, _ in MEASURES}))
-                        break
-        if pts:
-            pts.sort()
-            T = np.array([p[0] for p in pts])
-            vals = {k: np.array([p[1][k] for p in pts]) for k, _ in MEASURES}
+                        for k, _ in MEASURES:
+                            bucket[k].append(float(row[k]))
+        if by_T:
+            Ts = sorted(by_T)
+            T = np.array(Ts)
+            vals = {}
+            for k, _ in MEASURES:
+                arrs = [np.array(by_T[t][k]) for t in Ts]
+                vals[k] = (np.array([a.mean() for a in arrs]),
+                          np.array([a.std(ddof=1) if len(a) > 1 else 0.0 for a in arrs]),
+                          np.array([len(a) for a in arrs]))
             out[N] = (T, vals)
         else:
             print(f"[warn] no metrics for N={N} ({prefix}*)")
@@ -74,15 +86,18 @@ def load(root: Path, method="ols"):
 
 
 def plot_grid(data, colors, xfunc, xlabel, title):
-    """xfunc(N, T_ms array) -> x-values array. One figure, len(MEASURES) rows."""
+    """xfunc(N, T_ms array) -> x-values array. One figure, len(MEASURES) rows.
+    Error bars = std across seeds (invisible when n_seeds=1)."""
     fig, axes = plt.subplots(len(MEASURES), 1, figsize=(7, 11), squeeze=False)
     fig.subplots_adjust(left=0.13, right=0.97, top=0.93, bottom=0.06,
                         hspace=0.30)
     for r, (key, label) in enumerate(MEASURES):
         ax = axes[r][0]
         for (N, (T, vals)), c in zip(sorted(data.items()), colors):
-            ax.plot(xfunc(N, T), vals[key], "o-", color=c, lw=1.9, ms=6,
-                    label=f"N = {N}")
+            mean, std, n = vals[key]
+            ax.errorbar(xfunc(N, T), mean, yerr=std, fmt="o-", color=c,
+                        lw=1.9, ms=6, capsize=3, elinewidth=1.2,
+                        label=f"N = {N}")
         ax.set_xscale("log")
         ax.set(xlabel=xlabel, ylabel=label, ylim=(0, 1.02))
         ax.grid(True, color=fs.GRID, lw=0.6); ax.set_axisbelow(True)

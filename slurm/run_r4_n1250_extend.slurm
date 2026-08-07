@@ -4,12 +4,11 @@
 # N=12500 in fig_R4 (professor's feedback: lines should stretch across the
 # full horizontal axis, not sit in disjoint segments).
 #
-# Old max was 500k ms; this needs 5M ms, a LONGER simulation than what's
-# cached -> the ground-truth cache key changes and this triggers a full fresh
-# NEST resimulation (not free, unlike the N=12500 extension). N=1250 is the
-# cheapest size in the ladder though, so this should be well inside the time
-# budget below (conservative vs. N=12500's 5M-ms run, which took ~12h at 10x
-# more neurons).
+# 5 SEEDS (was 1): error bars for fig_R4. Seed 1 is already cached from the
+# first extend run, so this is really 4 new simulations. Observed cost for
+# ONE fresh 5M-ms sim at N=1250 was 16 min (2026-08-06 run), so 4 new seeds
+# should take well under an hour of actual compute -- the 8h budget below is
+# a large safety margin, not the expected runtime.
 #
 # Submit:  cd $(ws_find calcium_ar)/Calcium---AR
 #          sbatch slurm/run_r4_n1250_extend.slurm
@@ -41,7 +40,7 @@ print("torch", torch.__version__, "cuda", torch.cuda.is_available())
 PYCHK
 
 "$PY" scripts/wrapup_run_stream.py --net n1250_r4 \
-      --sweep 100000 200000 500000 1000000 2000000 5000000 --seeds 1 \
+      --sweep 100000 200000 500000 1000000 2000000 5000000 --seeds 1 2 3 4 5 \
       --methods ols --device cuda --chunk-ms 5000 \
       --cache-dir "$WS/gt_cache" --save-moments
 

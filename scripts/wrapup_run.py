@@ -123,6 +123,41 @@ NETS = {
     "n12500_r4": dict(n_excitatory=10000, n_inhibitory=2500, J_ex=0.150, g=8.0,
                       eta=2.60, V_reset=10.0, sim_time=5_000_000.0, n_threads=16,
                       lam_l1=1e-4, lam_l2=1e-4, name="wrapup_n12500r4"),
+
+    # --- R.4b: FIXED IN-DEGREE ladder (alternative to fixed-probability) ----- #
+    # The n*_r4 ladder above holds connection PROBABILITY fixed (epsilon=0.1),
+    # so in-degree C_E=eps*N_E GROWS with N (100 -> 1000 across the ladder) --
+    # more shared-input pathways per neuron at bigger N, which is the likely
+    # driver of the excitatory-recall gap found in R.4. Real cortex is closer to
+    # the OPPOSITE convention: a neuron's number of synaptic inputs is capped by
+    # its dendritic tree, roughly independent of total local population size --
+    # i.e. FIXED in-degree, with probability shrinking as N grows. This ladder
+    # tests that: C_E is held at 100 (n1250_r4's own value) at every size, so
+    # epsilon = 100/N_E shrinks (0.1 -> 0.01). Because C_E is now constant, J
+    # does NOT need to be rescaled by size either (same J=0.474 everywhere,
+    # unlike the r4 ladder) -- under the fluctuation-scaling convention, fixed
+    # C_E + fixed J should give near-N-INVARIANT local dynamics, so eta=1.30
+    # (n1250_r4's tuned value) is the theoretical prediction for every size too.
+    # n1250_ci is IDENTICAL to n1250_r4 (epsilon=0.1 either way) -- it's the
+    # shared anchor point, not a new simulation.
+    # VERIFY WITH A PREFLIGHT before trusting the full run (see the SLURM jobs) --
+    # this eta prediction is theory, not yet measured for N>1250.
+    "n1250_ci": dict(n_excitatory=1000, n_inhibitory=250, epsilon=0.1,
+                     J_ex=0.474, g=8.0, eta=1.30, V_reset=10.0,
+                     sim_time=500_000.0, n_threads=8,
+                     lam_l1=1e-4, lam_l2=1e-4, name="wrapup_n1250ci"),
+    "n2500_ci": dict(n_excitatory=2000, n_inhibitory=500, epsilon=0.05,
+                     J_ex=0.474, g=8.0, eta=1.30, V_reset=10.0,
+                     sim_time=1_000_000.0, n_threads=8,
+                     lam_l1=1e-4, lam_l2=1e-4, name="wrapup_n2500ci"),
+    "n5000_ci": dict(n_excitatory=4000, n_inhibitory=1000, epsilon=0.025,
+                     J_ex=0.474, g=8.0, eta=1.30, V_reset=10.0,
+                     sim_time=2_000_000.0, n_threads=8,
+                     lam_l1=1e-4, lam_l2=1e-4, name="wrapup_n5000ci"),
+    "n12500_ci": dict(n_excitatory=10000, n_inhibitory=2500, epsilon=0.01,
+                      J_ex=0.474, g=8.0, eta=1.30, V_reset=10.0,
+                      sim_time=5_000_000.0, n_threads=16,
+                      lam_l1=1e-4, lam_l2=1e-4, name="wrapup_n12500ci"),
 }
 
 

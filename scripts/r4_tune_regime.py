@@ -96,22 +96,36 @@ def main():
                     help="multiply the fluctuation-scaled J")
     ap.add_argument("--etas", type=float, nargs="+", default=None,
                     help="override the eta grid (narrow it once the range is known)")
+    ap.add_argument("--fixed-ce", type=float, default=None,
+                    help="FIXED IN-DEGREE mode: hold C_E at this value for every "
+                         "size (epsilon = fixed_ce/N_E per size, shrinking as N "
+                         "grows) instead of the default fixed epsilon=0.1 (C_E "
+                         "growing with N). J is then constant across sizes too "
+                         "(same JBASE/sqrt(fixed_ce) everywhere), since C_E no "
+                         "longer varies.")
     args = ap.parse_args()
 
     sizes = [s for s in SIZES if s[0] in args.sizes]
     etas = args.etas if args.etas else ETAS
     print(f"target rate ~{args.target} Hz   g={args.g:g}  V_reset=10  "
-          f"J*sqrt(C_E)={JBASE:.3f} (x{args.j_scale:g})\n")
-    print(f"{'N':>6} {'C_E':>5} {'J':>6} {'eta':>5} | {'rate':>6} {'CV':>5} "
+          f"J*sqrt(C_E)={JBASE:.3f} (x{args.j_scale:g})"
+          + (f"  [FIXED IN-DEGREE: C_E={args.fixed_ce:g} for every size]"
+             if args.fixed_ce else "") + "\n")
+    print(f"{'N':>6} {'eps':>6} {'C_E':>5} {'J':>6} {'eta':>5} | {'rate':>6} {'CV':>5} "
           f"{'sync':>6} {'silent':>6}")
-    print("-" * 60)
+    print("-" * 68)
     picks = {}
     for N, NE, NI in sizes:
-        C_E = int(0.1 * NE)
+        if args.fixed_ce:
+            C_E = args.fixed_ce
+            epsilon = C_E / NE
+        else:
+            C_E = int(0.1 * NE)
+            epsilon = 0.1
         J = args.j_scale * JBASE / np.sqrt(C_E)
         best = None
         for eta in etas:
-            net = BrunelNetwork(n_excitatory=NE, n_inhibitory=NI, epsilon=0.1,
+            net = BrunelNetwork(n_excitatory=NE, n_inhibitory=NI, epsilon=epsilon,
                                 g=args.g, eta=eta, J_ex=J, V_reset=10.0, delay=1.5,
                                 sim_time=args.sim_time, dt=0.1,
                                 n_threads=args.n_threads, seed=1)
@@ -119,8 +133,9 @@ def main():
             idx, tms = net.get_spike_events()
             r = sparse_stats(idx, tms, NE + NI, args.sim_time, args.warmup_ms)
             del net
-            print(f"{N:>6} {C_E:>5} {J:>6.3f} {eta:>5.2f} | {r['rate']:>6.1f} "
-                  f"{r['cv']:>5.2f} {r['sync']:>6.3f} {r['silent']:>6.2f}", flush=True)
+            print(f"{N:>6} {epsilon:>6.4f} {C_E:>5.0f} {J:>6.3f} {eta:>5.2f} | "
+                  f"{r['rate']:>6.1f} {r['cv']:>5.2f} {r['sync']:>6.3f} "
+                  f"{r['silent']:>6.2f}", flush=True)
             if best is None or abs(r["rate"] - args.target) < abs(best[1] - args.target):
                 best = (eta, r["rate"], r["cv"], r["sync"], J)
         picks[N] = best

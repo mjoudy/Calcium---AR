@@ -2,14 +2,22 @@
 # R.4 scaling ladder, TOP RUNG: N=12500 in the matched AI regime
 # (g=8, J=0.150, eta=2.60, V_reset=10  ->  13.9 Hz, CV 1.06, synchrony 0.007).
 #
-# Its own job because it is the expensive one: ONE 5M-ms simulation, scored at
-# SIX checkpoints (100k/200k/500k/1M/2M/5M ms) so this line spans the full
-# fig_R4 x-axis, matching N=1250/2500/5000's grid. Each checkpoint is solved
-# and SAVED as it is reached, so a timeout still leaves the shorter recordings
-# on disk. The 3 new short checkpoints (100k/200k/500k) are CHEAP to add: the
-# ground-truth cache key is keyed on max(sweep)=5,000,000ms, unchanged from
-# before, so this reuses the existing cached simulation instead of resimulating
-# -- see the "cache reuse" note in scripts/wrapup_run_stream.py.
+# Its own job because it is the expensive one: ONE 5M-ms simulation per seed,
+# scored at SIX checkpoints (100k/200k/500k/1M/2M/5M ms) so this line spans the
+# full fig_R4 x-axis, matching N=1250/2500/5000's grid. Each checkpoint is
+# solved and SAVED as it is reached, so a timeout still leaves the shorter
+# recordings on disk.
+#
+# 5 SEEDS (was 1): error bars for fig_R4. Seed 1's checkpoints are already
+# cached (this job originally just added the 3 short ones for free -- see the
+# "cache reuse" note in scripts/wrapup_run_stream.py), but seeds 2-5 are NEW
+# and each needs a full fresh 5M-ms NEST simulation -- there's no shortcut for
+# those. This is the expensive one: extrapolating from observed costs at
+# smaller N (N=1250:16min, N=2500:32min, N=5000:66min, roughly linear in N),
+# N=12500 at 5M ms is ~2.5-3h per seed, so 4 new seeds ~= 10-12h. Time budget
+# below is a safety margin on top of that extrapolation (not yet measured
+# directly for N=12500) -- if your partition caps job time below this, split
+# seeds 2-5 into separate jobs instead of one.
 #
 # NOTE this replaces the reuse of wrapup_n12500lr (g=6, J=0.1): that run is a
 # different regime family (CV 0.62) and is no longer part of this ladder. It
@@ -25,13 +33,12 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=240G
-#SBATCH --time=12:00:00
+#SBATCH --time=24:00:00
 #SBATCH --output=slurm_logs/r4_n12500_%j.log
 #
-# 240G: spike events at ~14 Hz x 12500 neurons x 5000 s is ~875M events; they are
-# stored as int16 index + int32 time (~6 B/event), but the streaming feed and the
-# N x N moment matrices still need headroom.
-# 12 h: the same-length low-rate run took ~6-8 h at a comparable rate.
+# 240G: spike events at ~14 Hz x 12500 neurons x 5000 s is ~875M events per
+# seed; processed sequentially so peak memory doesn't grow with seed count.
+# 24 h: ~10-12h extrapolated for the 4 new seeds, generous margin on top.
 
 set -eo pipefail
 
@@ -59,7 +66,7 @@ echo "=== regime preflight: N=12500, g=8, J x1.5, eta=2.60 ==="
       --etas 2.6 --target 14 --n-threads "${SLURM_CPUS_PER_TASK}" || true
 
 "$PY" scripts/wrapup_run_stream.py --net n12500_r4 \
-      --sweep 100000 200000 500000 1000000 2000000 5000000 --seeds 1 \
+      --sweep 100000 200000 500000 1000000 2000000 5000000 --seeds 1 2 3 4 5 \
       --methods ols --device cuda --chunk-ms 5000 \
       --cache-dir "$WS/gt_cache" --save-moments
 
