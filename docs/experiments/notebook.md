@@ -125,6 +125,25 @@ gap" question definitively (no, not for excitatory recall). Could check if the
 excitatory-recall gap scales cleanly with C_E specifically (linear? sqrt?) if
 useful for the report.
 
+**Addendum — bias vs. variance framing (2026-08-07):** why precision and
+recall moved *together* (both worse at large N) instead of trading off, and
+why correlation converges while they don't, is cleanest explained as a
+bias/variance split, worth keeping for the report write-up:
+- Precision/recall trade off when sliding the *threshold* on one fixed
+  classifier. Here we're comparing *different* classifiers (by N) at the same
+  fixed threshold — when the underlying separation itself degrades, precision
+  and recall fall together (more false positives AND more false negatives at
+  once), they don't trade off.
+- **Correlation is a variance problem** — more recording lets OLS converge
+  more precisely everywhere, so it shrinks with data and converges across N.
+- **Excitatory precision/recall are a bias problem** — shared-input
+  confounding is a real feature of the true data (two neurons sharing a driver
+  genuinely do correlate, synapse or not), not sampling noise. More data
+  measures that fake correlation more precisely; it doesn't remove it. Bias
+  doesn't shrink with T, and here it grows with N specifically (in-degree
+  C_E=ε·N_E), so the gap is structural, not fixable by recording longer.
+- One-liner: *"More data fixes noise, not confounding."*
+
 ---
 
 ### 2026-08-06 — R.2 restructured: dye τ and camera rate swept one at a time (not as a ratio)
