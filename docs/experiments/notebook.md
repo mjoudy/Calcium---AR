@@ -102,6 +102,13 @@ panel).
 2. **Excitatory recall does NOT converge.** At the same T=5M ms: N=1250≈0.77,
    N=2500≈0.70, N=5000≈0.60, N=12500≈0.46 — a clean, monotonic, persistent gap
    by size that more data does not close.
+3. **Excitatory precision shows the same persistent gap** (added as a 3rd row,
+   free — already in the cached `metrics.csv`, no new runs). At T=5M ms:
+   N=1250≈0.75 down to N=12500≈0.55, same clean monotonic-by-N separation as
+   recall. So it's not just that big-N estimators miss real excitatory edges
+   (recall) — their positive calls are also proportionally less trustworthy
+   (precision). Both directions of the confound persist with N regardless of
+   data amount.
 
 **Conclusion:** this is the same shared-input-confounding mechanism already
 established in R.7/R.8 ([[shared_input_findings.md]]), now shown to be
@@ -109,9 +116,9 @@ structural rather than a data-amount effect: fixed connection probability
 (ε=0.1) means in-degree C_E=ε·N_E scales with N, so bigger networks have
 proportionally more shared common input per neuron regardless of recording
 length. Correlation (dominated by inhibition + overall fit) isn't very
-sensitive to this and converges; excitatory-specific recall is directly capped
-by it and doesn't. Report implication: don't present "more data fixes
-everything" — split the claim by metric.
+sensitive to this and converges; excitatory recall AND precision are both
+directly capped by it and don't. Report implication: don't present "more data
+fixes everything" — split the claim by metric.
 
 **Next:** none planned; this closes out the "does more data fix the N-scaling
 gap" question definitively (no, not for excitatory recall). Could check if the

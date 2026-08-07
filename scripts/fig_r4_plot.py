@@ -37,7 +37,8 @@ DT = 0.1  # ms per sample
 # N -> directory prefix (the R.4 ladder; N=12500 reuses the low-rate A2 run)
 LADDER = [(1250, "wrapup_n1250r4_T"), (2500, "wrapup_n2500r4_T"),
           (5000, "wrapup_n5000r4_T"), (12500, "wrapup_n12500r4_T")]
-MEASURES = [("corr", "correlation"), ("E_rec", "excitatory recall")]
+MEASURES = [("corr", "correlation"), ("E_rec", "excitatory recall"),
+            ("E_prec", "excitatory precision")]
 
 
 def load(root: Path, method="ols"):
@@ -78,8 +79,8 @@ def main():
         raise SystemExit(f"no metrics.csv found under {args.root}")
     colors = plt.cm.viridis(np.linspace(0.15, 0.85, len(data)))
 
-    fig, axes = plt.subplots(len(MEASURES), 1, figsize=(7, 8), squeeze=False)
-    fig.subplots_adjust(left=0.13, right=0.97, top=0.89, bottom=0.09,
+    fig, axes = plt.subplots(len(MEASURES), 1, figsize=(7, 11), squeeze=False)
+    fig.subplots_adjust(left=0.13, right=0.97, top=0.93, bottom=0.06,
                         hspace=0.30)
 
     for r, (key, label) in enumerate(MEASURES):
