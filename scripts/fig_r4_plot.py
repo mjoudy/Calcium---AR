@@ -2,14 +2,21 @@
 R.4 (data length x network size) — the scaling law, plotted LOCALLY.
 
 Reads the small metrics.csv files produced on the cluster (one per size x
-recording length) and draws one column: measure vs recording length -> bigger
-N needs more data. (The "vs T/N, curves collapse" column was dropped per
-professor's feedback — it was somewhat trivially built-in by the sweep design,
-matched samples-per-neuron ratios at every N, rather than a discovered
-collapse.)
+recording length) and draws the PRIMARY figure as one column: measure vs
+recording length -> bigger N needs more data. (The old "vs T/N, curves
+collapse" column was dropped from this figure per professor's feedback — it
+was somewhat trivially built-in by the sweep design, matched samples-per-neuron
+ratios at every N, rather than a discovered collapse.)
 
-rows = correlation and excitatory recall (the two measures with dynamic range;
-ROC-AUC saturates and squashes the collapse against the ceiling).
+rows = correlation, excitatory recall, excitatory precision.
+
+A SECONDARY appendix figure (--out-tn) revisits the "vs T/N" axis, but now to
+directly test a specific question rather than just demo the collapse: does
+matching samples-per-neuron erase the size gap for ALL three measures, or only
+for correlation? (Prediction: correlation is a variance problem and should
+collapse; excitatory recall/precision are a bias problem driven by raw N
+(shared-input confounding scales with in-degree C_E=eps*N), so they should
+stay separated by N even at matched T/N.) Zero new compute — same cached CSVs.
 
 All four sizes share one AI regime (13.9-14.8 Hz, CV 0.98-1.06, synchrony
 0.007-0.010), so N is the only variable. OLS only.
@@ -66,10 +73,31 @@ def load(root: Path, method="ols"):
     return out
 
 
+def plot_grid(data, colors, xfunc, xlabel, title):
+    """xfunc(N, T_ms array) -> x-values array. One figure, len(MEASURES) rows."""
+    fig, axes = plt.subplots(len(MEASURES), 1, figsize=(7, 11), squeeze=False)
+    fig.subplots_adjust(left=0.13, right=0.97, top=0.93, bottom=0.06,
+                        hspace=0.30)
+    for r, (key, label) in enumerate(MEASURES):
+        ax = axes[r][0]
+        for (N, (T, vals)), c in zip(sorted(data.items()), colors):
+            ax.plot(xfunc(N, T), vals[key], "o-", color=c, lw=1.9, ms=6,
+                    label=f"N = {N}")
+        ax.set_xscale("log")
+        ax.set(xlabel=xlabel, ylabel=label, ylim=(0, 1.02))
+        ax.grid(True, color=fs.GRID, lw=0.6); ax.set_axisbelow(True)
+        fs.despine(ax)
+    axes[0][0].legend(fontsize=9, loc="lower right")
+    fig.suptitle(title, fontsize=13, color=fs.INK, x=0.08, ha="left", y=0.965)
+    return fig
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", default="/home/mjoudy/calcium_results/hpc_metrics")
     ap.add_argument("--out", default="figures/fig_R4")
+    ap.add_argument("--out-tn", default="figures/fig_R4_TN",
+                    help="appendix figure: same measures vs samples-per-neuron T/N")
     ap.add_argument("--title", default=None)
     args = ap.parse_args()
 
@@ -79,24 +107,18 @@ def main():
         raise SystemExit(f"no metrics.csv found under {args.root}")
     colors = plt.cm.viridis(np.linspace(0.15, 0.85, len(data)))
 
-    fig, axes = plt.subplots(len(MEASURES), 1, figsize=(7, 11), squeeze=False)
-    fig.subplots_adjust(left=0.13, right=0.97, top=0.93, bottom=0.06,
-                        hspace=0.30)
-
-    for r, (key, label) in enumerate(MEASURES):
-        ax = axes[r][0]
-        for (N, (T, vals)), c in zip(sorted(data.items()), colors):
-            ax.plot(T, vals[key], "o-", color=c, lw=1.9, ms=6, label=f"N = {N}")
-        ax.set_xscale("log")
-        ax.set(xlabel="recording length (ms)", ylabel=label, ylim=(0, 1.02))
-        ax.grid(True, color=fs.GRID, lw=0.6); ax.set_axisbelow(True)
-        fs.despine(ax)
-    axes[0][0].legend(fontsize=9, loc="lower right")
-
+    # ---- primary: vs recording length (ms) --------------------------------- #
     title = args.title or ("Scaling: recovery is set by data per neuron "
                            "(matched AI regime, ~14 Hz, OLS)")
-    fig.suptitle(title, fontsize=13, color=fs.INK, x=0.08, ha="left", y=0.965)
+    fig = plot_grid(data, colors, lambda N, T: T, "recording length (ms)", title)
     fs.save(fig, args.out)
+
+    # ---- appendix: vs samples per neuron T/N -------------------------------- #
+    title_tn = ("Same measures at matched samples-per-neuron (T/N) — "
+               "does the size gap survive?")
+    fig2 = plot_grid(data, colors, lambda N, T: (T / DT) / N,
+                     "samples per neuron   T / N", title_tn)
+    fs.save(fig2, args.out_tn)
 
 
 if __name__ == "__main__":

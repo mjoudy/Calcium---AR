@@ -144,6 +144,18 @@ bias/variance split, worth keeping for the report write-up:
   C_E=ε·N_E), so the gap is structural, not fixable by recording longer.
 - One-liner: *"More data fixes noise, not confounding."*
 
+**Addendum — matched-T/N confirms the split directly (2026-08-07):** built an
+appendix figure (`figures/fig_R4_TN`, `scripts/fig_r4_plot.py --out-tn`, zero
+new compute — same cached CSVs, just plotted vs T/N instead of raw T) to test
+the prediction. Confirmed exactly: **correlation collapses** onto one curve
+across all 4 N when plotted vs samples-per-neuron (T/N) — it really is a
+variance/data-per-parameter effect. **Excitatory recall and precision do NOT
+collapse** — same clean N-ordered separation persists even at matched T/N
+(e.g. at T/N≈4000: recall 0.77 (N=1250) vs 0.46 (N=12500), same gap as vs raw
+T). Clean, direct, one-figure proof that T/N is the right variable for the
+correlation story and the wrong variable for the excitatory story — that one
+is driven by raw N (in-degree), not by any per-neuron data ratio.
+
 ---
 
 ### 2026-08-06 — R.2 restructured: dye τ and camera rate swept one at a time (not as a ratio)
