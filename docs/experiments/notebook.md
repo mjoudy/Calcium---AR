@@ -75,6 +75,32 @@ which params were held fixed.
 **Next:** follow-up ideas.
 -->
 
+### 2026-08-08 — PRELIMINARY: fixed-in-degree scaling may explain most of the N-gap
+**Status: 1 of 3 sizes done (N=2500-ci), N=5000-ci/N=12500-ci still running on the
+cluster — do not treat as confirmed yet, revisit once they land.**
+
+`figures/fig_R4_CI` (5 seeds, N=2500 fixed-in-degree C_E=100 vs. the original
+fixed-probability N=2500): **excitatory recall reaches ~0.99 by T=5M ms under
+fixed in-degree — not just closing the gap with fixed-probability N=2500
+(0.70), but exceeding even N=1250's fixed-probability recall (0.77).**
+Excitatory precision is more nuanced: fixed-in-degree N=2500 plateaus ~0.48
+while fixed-probability N=2500 keeps climbing to ~0.70 — the benefit isn't
+symmetric across both metrics. Correlation is roughly unchanged between the
+two scaling conventions (consistent with it being variance- not bias-limited).
+
+If this holds at N=5000/12500 too: the R.4 "excitatory recall gap widens with
+N" finding was **substantially a scaling-convention artifact** (fixed
+connection probability, not fixed in-degree) rather than an unavoidable
+property of larger networks — a big revision to how the report should frame
+the N-scaling result. See [[shared_input_findings.md]] for the mechanism this
+tests (in-degree C_E=eps*N drives the confound).
+
+**Next:** wait for N=5000-ci and N=12500-ci (running), confirm the pattern
+holds at those sizes before updating the "Findings at a glance" table or
+drawing report conclusions from this.
+
+---
+
 ### 2026-08-07 — R.4 extended to a full 6-point T grid; excitatory recall doesn't converge with N
 
 **Question:** Professor's feedback on fig_R4: (1) drop the right "vs T/N, curves
