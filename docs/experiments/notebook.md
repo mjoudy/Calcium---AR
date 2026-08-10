@@ -29,7 +29,7 @@ One line per parameter. Updated as evidence comes in. "—" = not yet tested.
 | input stage (spikes vs calcium) | **Calcium is not the bottleneck**, but preprocessing is still needed. Preprocessed feed recovers ~95 % of spike-level Pearson. RAW calcium (no prep) gives a *higher but fake* Pearson (0.48) with worse AUC/type/precision — prep removes that confound. | preprocess (don't skip) | 2026-06-18 |
 | camera frame rate (R.2, dye τ vs camera dt, swept separately) | **Deconvolution trades noise for rank.** At a fast camera (dt≲2ms) deconvolved AUC > raw, but deconvolved *correlation* < raw — differentiation amplifies noise fastest exactly when frames are close together. Crosses over (deconv wins both) around dt≈5–10ms. Every other figure in the project (R.1/4/5/7/8) implicitly assumes an infinitely-fast camera (dt=0.1ms, no downsampling) — R.2 is the only place a realistic frame rate is modeled at all. | slow enough camera (≳5–10ms) for deconvolution to pay off on magnitude too | 2026-08-06 |
 | network size N, fixed connection PROBABILITY (R.4, ε=0.1 always, C_E grows with N) | **Correlation converges with N; excitatory recall/precision do NOT.** At matched absolute T, correlation converges to ~0.8–0.85 by 5M ms. Excitatory recall/precision stay separated by N (recall: N=1250 ~0.77 vs N=12500 ~0.46 at the same T) — structural under THIS scaling convention, driven by in-degree C_E=ε·N growing with N. | more data helps correlation broadly; does not fix excitatory recall/precision under fixed probability | 2026-08-07 |
-| network size N, fixed IN-DEGREE (R.4b, C_E=100 always, ε shrinks with N — more biologically motivated) | **The N-gap above is mostly a scaling-convention artifact, not unavoidable.** Under fixed in-degree, both recall AND precision *improve* with N (AUC_E 0.996→1.000, recall 0.86→0.99, precision 0.85→0.98 from N=2500→12500) — the opposite direction from the fixed-probability ladder. Caught and fixed a threshold-calibration bug along the way (default 10%-density cutoff was wrong once true density shrinks with N) — see the 2026-08-08 log entry for the full story. | fixed in-degree, not fixed probability, if biological realism is the goal | 2026-08-08 |
+| network size N, fixed IN-DEGREE (R.4b, C_E=100 always, ε shrinks with N — more biologically motivated) | **The N-gap above is a scaling-convention artifact, not unavoidable — and it fully REVERSES.** Full grid, 3 sizes confirmed: recall/precision 0.86/0.85 (N=2500) → 0.94/0.93 (N=5000) → 0.99/0.98 (N=12500). N=12500-ci beats even N=1250's fixed-probability ceiling. Bigger networks go from structurally worse to structurally better once in-degree, not probability, is held fixed. Correlation converges either way (data-amount, not confound). Caught+fixed a threshold-calibration bug along the way — see 2026-08-08/2026-08-10 log entries. | fixed in-degree, not fixed probability, if biological realism is the goal | 2026-08-10 |
 
 ---
 
@@ -116,9 +116,31 @@ structurally worse at excitatory recovery (R.4's original finding, still true
 convention, that gap is not structural at all — it *improves* with N. State
 both, and be explicit about which scaling convention is being discussed.
 
-**Next:** rescore the remaining checkpoints (100k-2000k, not just 5000k) for
-all three ci sizes with the correct density so the full fig_R4_CI curve is
-consistent end to end, then regenerate the figure.
+**UPDATE (2026-08-10) — full grid rescored, all 6 checkpoints x 3 sizes, result
+holds and is even stronger than the single-checkpoint check suggested:**
+`figures/fig_R4_CI` now shows the complete curves, correctly thresholded
+throughout. **The order doesn't just close, it fully reverses**: by T=5M ms,
+N=12500-ci reaches the HIGHEST recall (0.99) and precision (0.98) of every
+curve in the figure — including beating N=1250's fixed-probability ceiling
+(0.77/0.75). Under fixed in-degree, bigger networks go from "structurally
+worse" to "structurally better." Correlation converges normally regardless of
+which scaling convention is used (data-amount effect, not confound-severity).
+
+**Also resolved the same day:** pushed N=1250 to 20M ms and N=12500 to 10M ms
+(fixed-probability ladder) to test whether the original R.4 gap was a true
+plateau or just not-yet-converged (see the 2026-08-07 entry's open question).
+Answer: **N=1250 has genuinely plateaued** — flat at recall≈0.77 from 5M to
+20M ms (4x more data, zero improvement). N=12500 is still slowly climbing at
+10M ms (0.47→0.52) but decelerating, and still far below N=1250's ceiling —
+consistent with a real, data-independent ceiling under fixed probability, not
+merely insufficient data (though N=12500 alone hasn't fully flattened yet).
+Interestingly correlation behaves oppositely: N=1250 plateaus (~0.77) but
+N=12500 keeps climbing PAST it (~0.86 by 10M ms) — bigger N eventually wins on
+correlation with enough data, but not on excitatory recall/precision.
+
+**Next:** none outstanding for R.4/R.4b. Both the plateau question and the
+scaling-convention question are now answered with real data. Good place to
+write this section of the report.
 
 ---
 
