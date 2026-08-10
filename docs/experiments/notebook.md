@@ -28,7 +28,8 @@ One line per parameter. Updated as evidence comes in. "—" = not yet tested.
 | `sigma_extra` (noise) | **small effect at the optimum** — recording noise costs only ~0.02 Pearson (0.370 → 0.353) | minor | 2026-06-18 |
 | input stage (spikes vs calcium) | **Calcium is not the bottleneck**, but preprocessing is still needed. Preprocessed feed recovers ~95 % of spike-level Pearson. RAW calcium (no prep) gives a *higher but fake* Pearson (0.48) with worse AUC/type/precision — prep removes that confound. | preprocess (don't skip) | 2026-06-18 |
 | camera frame rate (R.2, dye τ vs camera dt, swept separately) | **Deconvolution trades noise for rank.** At a fast camera (dt≲2ms) deconvolved AUC > raw, but deconvolved *correlation* < raw — differentiation amplifies noise fastest exactly when frames are close together. Crosses over (deconv wins both) around dt≈5–10ms. Every other figure in the project (R.1/4/5/7/8) implicitly assumes an infinitely-fast camera (dt=0.1ms, no downsampling) — R.2 is the only place a realistic frame rate is modeled at all. | slow enough camera (≳5–10ms) for deconvolution to pay off on magnitude too | 2026-08-06 |
-| network size N (R.4, full 6-point T grid: 100k–5000k ms, every N) | **Correlation converges with N; excitatory recall does NOT.** At matched *absolute* recording length (not just matched T/N), all 4 sizes' correlation converges to ~0.8–0.85 by T=5M ms — more data closes most of the gap. Excitatory recall does not converge: N=1250 reaches ~0.77, N=12500 only ~0.46, at the SAME recording length. Confirms the R.7/R.8 shared-input-confounding finding is structural (scales with in-degree C_E=ε·N, fixed ε=0.1), not a data-amount artifact — see [[shared_input_findings.md]]. | more data helps correlation broadly; does not fix excitatory recall at large N | 2026-08-07 |
+| network size N, fixed connection PROBABILITY (R.4, ε=0.1 always, C_E grows with N) | **Correlation converges with N; excitatory recall/precision do NOT.** At matched absolute T, correlation converges to ~0.8–0.85 by 5M ms. Excitatory recall/precision stay separated by N (recall: N=1250 ~0.77 vs N=12500 ~0.46 at the same T) — structural under THIS scaling convention, driven by in-degree C_E=ε·N growing with N. | more data helps correlation broadly; does not fix excitatory recall/precision under fixed probability | 2026-08-07 |
+| network size N, fixed IN-DEGREE (R.4b, C_E=100 always, ε shrinks with N — more biologically motivated) | **The N-gap above is mostly a scaling-convention artifact, not unavoidable.** Under fixed in-degree, both recall AND precision *improve* with N (AUC_E 0.996→1.000, recall 0.86→0.99, precision 0.85→0.98 from N=2500→12500) — the opposite direction from the fixed-probability ladder. Caught and fixed a threshold-calibration bug along the way (default 10%-density cutoff was wrong once true density shrinks with N) — see the 2026-08-08 log entry for the full story. | fixed in-degree, not fixed probability, if biological realism is the goal | 2026-08-08 |
 
 ---
 
@@ -75,9 +76,56 @@ which params were held fixed.
 **Next:** follow-up ideas.
 -->
 
-### 2026-08-08 — PRELIMINARY: fixed-in-degree scaling may explain most of the N-gap
-**Status: 1 of 3 sizes done (N=2500-ci), N=5000-ci/N=12500-ci still running on the
-cluster — do not treat as confirmed yet, revisit once they land.**
+### 2026-08-08 — Fixed-in-degree scaling explains most of the N-gap (confirmed, all 3 sizes)
+**Status: CONFIRMED at N=2500/5000/12500-ci. Supersedes the same-day PRELIMINARY
+entry below it, which had a real bug in the precision comparison — corrected here.**
+
+`figures/fig_R4_CI` (5 seeds each N=2500/5000, 3 seeds N=12500, fixed-in-degree
+C_E=100 vs. the original fixed-probability ladder), density-matched scoring
+(see bug below):
+
+| size | AUC_E | E_recall | E_precision |
+|---|---|---|---|
+| N=2500-ci | 0.996 | 0.86 | 0.85 |
+| N=5000-ci | 1.000 | 0.94 | 0.93 |
+| N=12500-ci | 1.000 | 0.99 | 0.98 |
+
+**Both recall AND precision improve with N under fixed in-degree** — the
+original R.4 "excitatory recall gap widens with N" finding was substantially a
+**fixed-probability scaling-convention artifact**, not an unavoidable property
+of bigger networks. Fixed-probability N=2500's best precision (0.70) is beaten
+by fixed-in-degree N=2500 (0.85) once scored correctly.
+
+**Bug found and fixed along the way, worth remembering:** `analyze_run.py`
+thresholds at a FIXED 10%-density cutoff by default. That's correctly
+calibrated for the fixed-probability ladder (true density ~10% everywhere),
+but wrong for fixed-in-degree, where true density shrinks with N (ε=0.05 at
+N=2500, 0.025 at N=5000, 0.01 at N=12500) — forcing a 10% cutoff on a ~5%-dense
+network guarantees ~half the "positive" calls are padding, independent of
+confound severity. First-pass numbers (precision plateauing ~0.48 for
+N=2500-ci) were entirely this artifact — AUC_E (threshold-free) already showed
+fixed in-degree was *better* (0.996 vs 0.965), which is what caught it. Fix:
+`analyze_run.py --density <true epsilon for that network>`, not the default.
+**Any future scoring of the ci ladder (or any non-10%-density network) must
+pass the matching `--density`, not rely on the default.**
+
+**Report implication:** the N-scaling story needs a real split now — under the
+project's original (fixed-probability) scaling convention, bigger networks are
+structurally worse at excitatory recovery (R.4's original finding, still true
+*for that convention*). Under the more biologically-motivated fixed-in-degree
+convention, that gap is not structural at all — it *improves* with N. State
+both, and be explicit about which scaling convention is being discussed.
+
+**Next:** rescore the remaining checkpoints (100k-2000k, not just 5000k) for
+all three ci sizes with the correct density so the full fig_R4_CI curve is
+consistent end to end, then regenerate the figure.
+
+---
+
+### 2026-08-08 — PRELIMINARY (SUPERSEDED, see corrected entry above): fixed-in-degree scaling may explain most of the N-gap
+**Superseded 2026-08-08 — the precision numbers here were a threshold-mismatch
+bug, not a real finding. Kept for the record of how it was caught, not as a
+citable result.**
 
 `figures/fig_R4_CI` (5 seeds, N=2500 fixed-in-degree C_E=100 vs. the original
 fixed-probability N=2500): **excitatory recall reaches ~0.99 by T=5M ms under
