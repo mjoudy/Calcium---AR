@@ -76,6 +76,38 @@ which params were held fixed.
 **Next:** follow-up ideas.
 -->
 
+### 2026-08-11 — Checked the professor's own papers: they use fixed probability, not fixed in-degree
+**Question:** given fixed in-degree is the more biologically-motivated scaling
+convention (see 2026-08-10 discussion), does the professor's own published
+work (Pernice/Rotter) support fixed probability or fixed in-degree when
+network size varies?
+
+**Checked directly** (4 PDFs: Pernice 2011 PLoS CB, Pernice 2012 PhysRevE,
+Pernice & Rotter 2013 J Stat Mech, Schiefer/Pernice/Rotter 2018 PLoS CB) — full
+writeup in `docs/theory/shared_input_theoretical_grounding.md` Section 6.
+**All four use fixed connection probability whenever they touch network size
+at all** — most direct precedent: Pernice 2012 Fig. 4/5 explicitly scales N
+"assuming a uniform connection probability p." This corrects an earlier
+in-chat claim (that balanced-network theory typically fixes in-degree when
+scaling N) — that classical argument (van Vreeswijk & Sompolinsky's dilute
+limit) is real but is a different tradition than what these specific,
+directly-relevant papers do.
+
+**Best guess why (unconfirmed, worth asking Prof. Rotter directly):**
+mathematical convenience — fixed-p (Erdős–Rényi) graphs are the ensemble
+random matrix theory and the mean-field self-consistency equations in these
+papers are built for; none of the four papers actually pose R.4's specific
+question ("grow the same kind of network, keep the dynamics matched, see what
+happens to inference").
+
+**Conclusion:** citing the professor's own papers as precedent for fixed
+probability is accurate, but it's precedent for a different question than R.4
+asks. Recommend presenting both conventions in the report rather than picking
+one as "correct," and asking Prof. Rotter directly why fixed probability
+became the group's standard.
+
+---
+
 ### 2026-08-08 — Fixed-in-degree scaling explains most of the N-gap (confirmed, all 3 sizes)
 **Status: CONFIRMED at N=2500/5000/12500-ci. Supersedes the same-day PRELIMINARY
 entry below it, which had a real bug in the precision comparison — corrected here.**
