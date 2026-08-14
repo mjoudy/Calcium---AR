@@ -33,7 +33,8 @@ import matplotlib.pyplot as plt
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import figstyle as fs
 
-MEASURES = [("corr", "correlation"), ("E_rec", "excitatory recall")]
+MEASURES = [("corr", "correlation"), ("E_rec", "excitatory recall"),
+            ("pr_ap", "PR-AUC (connected vs. none)")]
 METHOD_ORDER = ["ols", "ridge", "lasso", "en", "lassodale", "endale"]
 METHOD_LABEL = {"ols": "OLS", "ridge": "Ridge", "lasso": "Lasso", "en": "EN",
                 "lassodale": "Lasso+Dale", "endale": "EN+Dale"}
@@ -74,7 +75,7 @@ def best_vs_TN(rows, method, key):
 def fig_crossover(data, out):
     nets = list(data)
     fig, axes = plt.subplots(len(MEASURES), len(nets),
-                             figsize=(6.4 * len(nets), 8), squeeze=False)
+                             figsize=(6.4 * len(nets), 3.6 * len(MEASURES)), squeeze=False)
     fig.subplots_adjust(left=0.08, right=0.98, top=0.9, bottom=0.09,
                         hspace=0.28, wspace=0.2)
     for c, net in enumerate(nets):
@@ -107,7 +108,7 @@ def fig_crossover(data, out):
 def fig_lambda(data, out, method="en"):
     nets = list(data)
     fig, axes = plt.subplots(len(MEASURES), len(nets),
-                             figsize=(6.4 * len(nets), 8), squeeze=False)
+                             figsize=(6.4 * len(nets), 3.6 * len(MEASURES)), squeeze=False)
     fig.subplots_adjust(left=0.08, right=0.98, top=0.9, bottom=0.09,
                         hspace=0.28, wspace=0.2)
     for c, net in enumerate(nets):

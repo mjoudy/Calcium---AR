@@ -45,7 +45,16 @@ DT = 0.1  # ms per sample
 LADDER = [(1250, "wrapup_n1250r4_T"), (2500, "wrapup_n2500r4_T"),
           (5000, "wrapup_n5000r4_T"), (12500, "wrapup_n12500r4_T")]
 MEASURES = [("corr", "correlation"), ("E_rec", "excitatory recall"),
-            ("E_prec", "excitatory precision")]
+            ("E_prec", "excitatory precision"), ("pr_ap", "PR-AUC (connected vs. none)")]
+
+# Canonical checkpoint grid, ms -- every N is meant to land on exactly these
+# ten points (2026-08-14 decision: unify to N=1250's original grid rather than
+# a coarser common one, since checkpointing within one run is free once the
+# run's max length is fixed). Any directory whose T isn't on this list is a
+# leftover exploratory point (e.g. the old single-seed 400k/800k probes at
+# N=2500/5000) and is deliberately EXCLUDED here rather than plotted alongside
+# properly-seeded points.
+GRID_MS = [1e5, 2e5, 5e5, 1e6, 2e6, 5e6, 7.5e6, 1e7, 1.5e7, 2e7]
 
 
 def load(root: Path, method="ols"):
@@ -54,7 +63,8 @@ def load(root: Path, method="ols"):
     Aggregates across every seed<k>/ row in metrics.csv at each recording
     length (analyze_run.py already writes one row per seed x method, so this
     is just grouping + mean/std -- no new compute needed). n_seeds=1 -> std=0,
-    so old single-seed data still plots fine, just without visible error bars.
+    so old single-seed data still plots fine, just without a visible band.
+    Only T values on GRID_MS are kept -- see the comment there.
     """
     out = {}
     for N, prefix in LADDER:
@@ -64,6 +74,8 @@ def load(root: Path, method="ols"):
             if not f.exists():
                 continue
             T_ms = float(d.name.rsplit("_T", 1)[1].rstrip("k")) * 1000.0
+            if not any(abs(T_ms - g) < 1.0 for g in GRID_MS):
+                continue
             bucket = by_T.setdefault(T_ms, {k: [] for k, _ in MEASURES})
             with open(f) as fh:
                 for row in csv.DictReader(fh):
@@ -87,17 +99,19 @@ def load(root: Path, method="ols"):
 
 def plot_grid(data, colors, xfunc, xlabel, title):
     """xfunc(N, T_ms array) -> x-values array. One figure, len(MEASURES) rows.
-    Error bars = std across seeds (invisible when n_seeds=1)."""
-    fig, axes = plt.subplots(len(MEASURES), 1, figsize=(7, 11), squeeze=False)
-    fig.subplots_adjust(left=0.13, right=0.97, top=0.93, bottom=0.06,
-                        hspace=0.30)
+    Spread across seeds is shown as a shaded +-1 SD band, not error-bar caps
+    (invisible when n_seeds=1, since std=0 there)."""
+    fig, axes = plt.subplots(len(MEASURES), 1, figsize=(7, 3.6 * len(MEASURES)),
+                             squeeze=False)
+    fig.subplots_adjust(left=0.13, right=0.97, top=0.94, bottom=0.05,
+                        hspace=0.32)
     for r, (key, label) in enumerate(MEASURES):
         ax = axes[r][0]
         for (N, (T, vals)), c in zip(sorted(data.items()), colors):
             mean, std, n = vals[key]
-            ax.errorbar(xfunc(N, T), mean, yerr=std, fmt="o-", color=c,
-                        lw=1.9, ms=6, capsize=3, elinewidth=1.2,
-                        label=f"N = {N}")
+            x = xfunc(N, T)
+            ax.fill_between(x, mean - std, mean + std, color=c, alpha=0.18, lw=0)
+            ax.plot(x, mean, "o-", color=c, lw=1.9, ms=6, label=f"N = {N}")
         ax.set_xscale("log")
         ax.set(xlabel=xlabel, ylabel=label, ylim=(0, 1.02))
         ax.grid(True, color=fs.GRID, lw=0.6); ax.set_axisbelow(True)

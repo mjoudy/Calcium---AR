@@ -746,3 +746,71 @@ is trustworthy. Implication: post-processing/regularization should target the
 *exact entries*, since the regions are already correct.
 
 ---
+
+### 2026-08-14 — R.4/R.5 review: recall vs correlation "contradiction" explained; PR-AUC added; grid unification started
+
+**Question:** `fig_R4` shows correlation up to ~0.8+ and excitatory recall up
+to ~0.77 (N=1250), but `fig_R5_conf`'s confusion matrices show ~49% of real
+excitatory edges landing in "predicted none" at N=12500. Is this a
+contradiction? Is it fixable by more data alone?
+
+**Answer — not a contradiction, two different operating points + two
+different metrics:**
+1. Correlation is an aggregate over ALL pairs (E/I/none combined); the huge
+   "none" majority dominates it, so it stays high even when excitatory
+   recall specifically is weak. High correlation never implied good
+   excitatory recall.
+2. R4's ~0.77 recall is N=1250's *long-recording plateau*; R5_conf's ~49-53%
+   is N=12500 — a different, much larger network, not the same point on the
+   same curve.
+3. Pulled the actual numbers behind fig_R4 (see table below): N=12500's
+   excitatory recall IS still climbing with more data, but decelerating hard
+   — each doubling of T buys less (1M→2M: +0.087, 5M→7.5M: +0.036,
+   7.5M→10M: +0.020) — while N=1250 is fully flat from 5M to 20M ms. **More
+   data helps some, but the trend argues against N=12500 ever reaching
+   N=1250's ~0.77 ceiling from data alone** — consistent with the
+   established shared-input-confounding mechanism (in-degree grows with N
+   under fixed connection probability), not a pure sample-size deficit.
+
+| T (ms) | N=1250 E_rec | N=12500 E_rec |
+|---|---|---|
+| 1,000,000 | 0.724 | 0.274 |
+| 5,000,000 | 0.770 | 0.466 |
+| 7,500,000 | 0.779 | 0.502 |
+| 10,000,000 | 0.778 | 0.522 |
+| 20,000,000 | 0.771 | *(not yet run — see below)* |
+
+**PR-AUC added (zero new compute):** `scripts/analyze_run.py`'s `score()` has
+computed `pr_ap` (average precision / PR-AUC, connected-vs-none) all along —
+it just wasn't plotted. Added as a 4th row to `fig_R4`/`fig_R4_TN`/`fig_R4_CI`
+and a 3rd row to `fig_R5`/`fig_R5_lambda`. Confirms the ROC-vs-PR asymmetry
+under class imbalance directly: at N=12500's longest recording, correlation
+reaches ~0.86 but PR-AUC only reaches ~0.67 — same run, ~0.19 gap purely from
+metric choice (see `docs/theory/metrics_glossary.md`, written up the same
+day, for the full ROC/PR/imbalance explanation destined for the report).
+
+**Also fixed:** `fig_R4`'s error bars are now a shaded ±1 SD band
+(`fill_between`) instead of error-bar caps, and the point grid is unified
+across all 4 sizes to one canonical 10-point list (100k…20M ms) via a
+`GRID_MS` filter in `fig_r4_plot.py` — this silently drops the old
+single-seed exploratory points (N=2500 @ 400k, N=5000 @ 400k/800k) that were
+never part of the main grid, rather than plotting them inconsistently
+alongside the properly-seeded ones.
+
+**In progress (submitted, not yet returned):** extending N=2500/5000/12500 to
+the same 20M-ms ceiling N=1250 already has, 5 seeds each, so every fig_R4
+curve spans the full x-axis. N=12500 is by far the most expensive step here
+(never run past 10M ms before) — split into a single-seed pilot
+(`run_r4_n12500_extend20m_pilot.slurm`) to validate the (extrapolated,
+unmeasured) ~10-12h/seed and ~650G/seed cost estimates before committing to
+the full 5-seed array job. R5 stays single-seed / N=1250+12500 only (decided
+against expanding its scope) but will pick up the same longer x-axis once
+R4's moments exist at those checkpoints — cheap, since it only re-solves
+cached moments (`run_r5_extend20m.slurm`), and N=1250's side of that can run
+immediately (its 20M-ms moments already exist from an earlier job).
+
+**Next:** run the N=12500 pilot, confirm cost, then the seeds-2-5 array job;
+re-run `run_r5_extend20m.slurm` once both are done; regenerate all fig_R4/R5
+figures with the complete grid.
+
+---
