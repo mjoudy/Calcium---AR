@@ -18,7 +18,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
-#SBATCH --mem=512G
+#SBATCH --mem=400G
 #SBATCH --time=30:00:00
 #SBATCH --output=slurm_logs/r4_n5000x20m_%j.log
 #
