@@ -42,4 +42,50 @@ Short by design — add new entries below as they come up, don't expand old ones
 - **Best guess why fixed probability is standard there (unconfirmed — worth asking directly):** likely mathematical convenience — fixed-p (Erdős–Rényi) graphs are the ensemble their random-matrix-theory/mean-field results are built for, not a deliberate claim about biological realism at scale.
 - **One-liner if asked "which is correct?"**: *"Both have a place: fixed probability matches this group's own precedent and NEST's classic example; fixed in-degree matches how real cortex actually scales — a neuron's input count is capped by its dendritic tree, not by how big the surrounding tissue sample is. We show both explicitly because the choice turns out to change the conclusion completely, which is itself a finding worth reporting."*
 
+## 4. Linearity boundary — LIF vs PIF vs OU, does more data/observation fix it?
+
+- **Direct test of "regression conditions everything away, so shared input shouldn't matter":**
+  measured shared-input excess-over-chance at 100% observed — **LIF (real) 28pp, PIF (τ_m×10,
+  still spiking) 8.6pp, OU (exact linear, analytic, no sim noise) ~0pp.** A truly linear system,
+  fully observed, shows the confound basically vanish — confirms the textbook claim (and
+  Pernice & Rotter's own math) is *correct in principle*. The real LIF+calcium system just isn't
+  linear enough for that to hold in practice.
+- **Partial observation is a separate problem, not the same one:** the exact-linear OU system
+  shows the SAME steep rise in false-positive rate at 50% observed as LIF does. So "nonlinearity"
+  and "hidden neurons" are two independent causes, not one — R.7 already showed hidden neurons
+  matter in aggregate; this isolates that from the linearity question cleanly.
+- **Multi-lag conditioning (joint VAR, several lags at once) gives a real, measured improvement**
+  on calcium feed (precision 0.474→0.594, false positives −32%) — but the false positives it
+  fixes have the *same* average shared-driver exposure as the ones that persist (attribution
+  ratio ≈1.00). Real effect, not proven to be a shared-input-specific fix — say "a real lever,"
+  not "solves the confound."
+- **One-liner if asked "does more data / more neurons fix this?"**: *"No — tested directly. A
+  perfectly linear network, fully observed, shows the confound vanish. The real spiking+calcium
+  system doesn't, even fully observed. That rules out 'just need more data' — it's a linearity
+  ceiling, now isolated from the separate, also-real, partial-observation ceiling."*
+
+---
+
+## 5. Is the method "failed"? Who is this actually for?
+
+- **No — a method with a mapped, understood limitation isn't broken, it's characterized.**
+  Inhibition: solid everywhere. Excitatory: solid when the system is near-linear and
+  well-observed. Outside that, the cause is now known (nonlinearity + partial observation,
+  tested separately) rather than an unexplained ceiling.
+- **Not unique to this project.** Pernice & Rotter (2013) — the professor's own cited paper —
+  needed sparsity regularization added on top of plain regression specifically because plain
+  regression alone retains a shared-input term. No one has solved this with a smarter regression
+  alone; it's a known, field-wide limit of passive/observational connectivity inference generally
+  (the neuroscience instance of unmeasured confounding in causal inference — unsolvable from
+  observation alone without either full linearity+observation, or intervention).
+- **Real audience:** (1) experimentalists — as a calibrated candidate-ranker ahead of expensive
+  targeted follow-up (patch-clamp, opto), and for relative comparisons across conditions even
+  without perfect absolute accuracy; inhibition alone is already usable as-is. (2) the field —
+  knowing precisely where/why this class of method breaks redirects future effort (multi-lag,
+  faster indicators, intervention-based methods) instead of assuming more data would fix it.
+- **One-liner if asked "so what is this good for?"**: *"Not a magic wiring-diagram reader — a
+  scoped, honest tool: reliable for inhibition and for excitatory connectivity in near-linear,
+  well-observed regimes; outside that, a calibrated candidate-ranker rather than ground truth,
+  with the ceiling's actual cause isolated instead of just observed."*
+
 <!-- Add new hints below this line, one section per topic. -->
