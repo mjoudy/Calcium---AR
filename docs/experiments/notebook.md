@@ -867,3 +867,41 @@ slope. That contrast, present even at 50% observed, is the same story in
 miniature.
 
 ---
+
+### 2026-08-14 — PIF/high-input-resistance pilot: intermediate between LIF and exact-linear
+
+**Follow-up to the OU test above.** OU shows the confound vanishes for an
+exactly linear system; this checks a *spiking* but more-linear system
+(tau_m x10 = 200ms, "high input resistance", removes most of the leak
+nonlinearity but keeps the hard spike threshold/reset) — the professor's
+originally suggested test, kept deliberately small-scale (pilot only).
+
+**Setup:** `n1250_pif` preset added to `wrapup_run.py` (same N/topology/J/g as
+`n1250_r4`, tau_m 20→200ms, eta re-tuned by direct probe to 8.0 → 13.7 Hz,
+sync 0.004 — asynchronous, but **CV=1.94**, notably more irregular than
+`n1250_r4`'s CV≈0.98 at the same rate). Single seed, T=100,000 ms (5x shorter
+than `n1250_r4`'s 500,000 ms — this is a pilot, not a production run) through
+the same calcium+deconvolution pipeline, then the identical Way 2 procedure.
+
+**Result — three-way comparison, N=1250, 100% observed:**
+
+| | LIF (n1250_r4) | PIF pilot (tau_m=200) | OU (exact linear) |
+|---|---|---|---|
+| FDR | 30.6% | 62.9% | 4.7% |
+| shared-input excess over chance | 28 pts | **8.6 pts** | ~0 pts |
+
+**Reading it:** the excess-over-chance number sits *between* LIF and the exact
+linear system — consistent with "more linear → less residual shared-input
+confound", a dose-response in the direction the professor's argument predicts.
+**But this is a single short pilot, not a controlled comparison** — the PIF
+run has 5x less data and a much higher CV (1.94 vs 0.98) than `n1250_r4`, and
+both of those independently push FDR up regardless of linearity (its overall
+FDR is worse than LIF's, not better — data length and irregularity are doing
+real work here, not just tau_m). The excess-over-chance number specifically
+is a more apples-to-apples read than FDR since it's normalized against this
+same run's own true-negative baseline, but the CV/data-length confound isn't
+ruled out. **Not a confirmed result** — if it looks worth pursuing, the next
+step is a same-T, same-CV-target production run (re-tune eta/g so CV~1, not
+just rate) before trusting the number.
+
+---
