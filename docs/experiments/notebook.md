@@ -905,3 +905,58 @@ step is a same-T, same-CV-target production run (re-tune eta/g so CV~1, not
 just rate) before trusting the number.
 
 ---
+
+### 2026-08-14 — Multi-lag estimator results found (already run 2026-08-04) + linearity synthesis: what the method is good for
+
+**Correction first:** earlier today I told the user the joint multi-lag
+estimator (`scripts/multilag_estimator.py`, built 2026-08-04) had "never been
+run." Wrong — checked local evidence only (no results dir, no notebook entry)
+and asserted absence without ever checking the cluster, which I have no
+direct access to. It was run twice, successfully, on 2026-08-04, the same day
+it was built (logs: `multilag_7667520.log`, `multilag_7667633.log`). Lesson:
+"no local evidence" is not "never run" when the compute happens somewhere I
+can't see directly — say "unconfirmed," not "never."
+
+**Multi-lag estimator result (N=1250, n1250_r4, single seed):**
+
+| | spikes | calcium feed |
+|---|---|---|
+| single-lag precision | 0.758 | 0.474 |
+| joint multi-lag precision | 0.759 (flat) | **0.594** |
+| false positives | 10,404→11,107 (+7%) | 43,673→**29,517 (−32%)** |
+
+No benefit on raw spikes; a real, substantial benefit on calcium feed — the
+opposite of what the "spikes = clean-timing upper bound" framing predicted.
+**Caveat that matters:** the shared-driver attribution check on this same run
+shows the false positives *fixed* by the joint estimator have essentially the
+same mean shared-driver exposure as the ones that *persisted* (ratio ≈1.00 on
+feed, 1.08 on spikes) — the improvement is real but not demonstrably a
+shared-input-specific fix. Could be general noise/model-order improvement
+instead. Report it as "a real lever," not "solves the confound."
+
+**Synthesis — three linearity tests together (all N=1250, same connectivity):**
+
+| | real LIF+calcium | PIF pilot (tau_m x10) | exact-linear OU |
+|---|---|---|---|
+| shared-input excess over chance, 100% observed | 28pp | 8.6pp (confounded by data/CV, not conclusive alone) | ~0pp |
+
+The OU result is the clean anchor: **regression-based inference is
+theoretically sound and empirically confirmed to fully remove shared-input
+confounding when the true dynamics are linear and well-observed.** The real
+LIF+calcium system isn't linear enough for that to hold, and the residual gap
+is structural (nonlinearity + single-lag conditioning not spanning shared
+drive's true memory) — not a data-volume or observation-coverage problem
+(consistent with R.7's aggregate finding).
+
+**How to describe the method going forward (for the report, and for future
+sessions of this project — see updated `[[shared-input-findings]]` memory):**
+not "recovers ground-truth connectivity," but "recovers a linear/effective
+approximation of connectivity, exact for linear systems (OU test), with a
+characterized structural ceiling on excitatory recovery specifically for
+nonlinear spiking + calcium-imaged + partially-observed regimes." State the
+boundary explicitly rather than reporting a single accuracy number. Concrete
+next steps if pursued further: extend the multi-lag estimator (more lags,
+N=12500, combine with R.8's symmetry filter) rather than chasing more raw
+data or more PIF tuning.
+
+---
