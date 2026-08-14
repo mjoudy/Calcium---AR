@@ -50,6 +50,7 @@ COMMON = dict(
     smooth_window_ms=3.1, tau_method="ransac",
     lag_ms=2.0,                 # deconvolved-feed landscape peak (~synaptic delay)
     n_iter=500,
+    tau_m=20.0,                 # membrane time const (ms); per-net override for PIF-like nets
 )
 
 # Per-net overrides. n100 reuses the existing small-net setup (few-synapse J_ex=10);
@@ -112,6 +113,19 @@ NETS = {
     "n1250_r4": dict(n_excitatory=1000, n_inhibitory=250, J_ex=0.474, g=8.0,
                      eta=1.30, V_reset=10.0, sim_time=500_000.0, n_threads=8,
                      lam_l1=1e-4, lam_l2=1e-4, name="wrapup_n1250r4"),
+    # --- PIF-like pilot: SAME topology/scale as n1250_r4, but tau_m x10 (20ms
+    # -> 200ms) to approximate a "high input resistance" perfect-integrator
+    # neuron (removes most of the leak nonlinearity; the spike threshold/reset
+    # is still there, so this is "more linear", not fully linear -- see the
+    # exact-linear OU test for that). eta re-tuned by direct probe (2026-08-14,
+    # scratch script, not committed) since nu_th scales with tau_m: eta=8.0 ->
+    # 13.7 Hz, sync 0.004 (AI-like), but CV=1.94 (much more irregular than
+    # n1250_r4's CV~0.98 at the same rate) -- note this, don't assume it away.
+    # SMALL-SCALE PILOT: sim_time kept short on purpose, extend only if the
+    # shared-input signal looks worth a full production run.
+    "n1250_pif": dict(n_excitatory=1000, n_inhibitory=250, J_ex=0.474, g=8.0,
+                      eta=8.0, V_reset=10.0, tau_m=200.0, sim_time=100_000.0,
+                      n_threads=8, lam_l1=1e-4, lam_l2=1e-4, name="wrapup_n1250pif"),
     "n2500_r4": dict(n_excitatory=2000, n_inhibitory=500, J_ex=0.335, g=8.0,
                      eta=1.50, V_reset=10.0, sim_time=1_000_000.0, n_threads=8,
                      lam_l1=1e-4, lam_l2=1e-4, name="wrapup_n2500r4"),
@@ -184,7 +198,7 @@ def make_feed(seed: int, cfg: dict) -> tuple[np.ndarray, np.ndarray]:
     net = BrunelNetwork(
         n_excitatory=cfg["n_excitatory"], n_inhibitory=cfg["n_inhibitory"],
         epsilon=cfg["epsilon"], g=cfg["g"], eta=cfg["eta"], J_ex=cfg["J_ex"],
-        delay=cfg["delay"], V_reset=cfg["V_reset"],
+        delay=cfg["delay"], V_reset=cfg["V_reset"], tau_m=cfg.get("tau_m", 20.0),
         sim_time=cfg["sim_time"], dt=dt,
         n_threads=cfg["n_threads"], seed=seed,
     )

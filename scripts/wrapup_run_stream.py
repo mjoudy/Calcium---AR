@@ -112,8 +112,8 @@ def main():
         sim_spec = dict(
             n_excitatory=cfg["n_excitatory"], n_inhibitory=cfg["n_inhibitory"],
             epsilon=cfg["epsilon"], g=cfg["g"], eta=cfg["eta"], J_ex=cfg["J_ex"],
-            delay=cfg["delay"], V_reset=cfg["V_reset"], dt=dt,
-            sim_time=max_T, seed=seed, n_threads=cfg["n_threads"],
+            delay=cfg["delay"], V_reset=cfg["V_reset"], tau_m=cfg.get("tau_m", 20.0),
+            dt=dt, sim_time=max_T, seed=seed, n_threads=cfg["n_threads"],
         )
         spec_str = json.dumps(sim_spec, sort_keys=True)
         spec_hash = hashlib.sha1(spec_str.encode()).hexdigest()[:10]
@@ -138,7 +138,7 @@ def main():
             net = BrunelNetwork(
                 n_excitatory=cfg["n_excitatory"], n_inhibitory=cfg["n_inhibitory"],
                 epsilon=cfg["epsilon"], g=cfg["g"], eta=cfg["eta"], J_ex=cfg["J_ex"],
-                delay=cfg["delay"], V_reset=cfg["V_reset"],
+                delay=cfg["delay"], V_reset=cfg["V_reset"], tau_m=cfg.get("tau_m", 20.0),
                 sim_time=max_T, dt=dt,
                 n_threads=cfg["n_threads"], seed=seed)
             net.build(); net.run(densify=False)

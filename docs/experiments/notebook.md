@@ -814,3 +814,56 @@ re-run `run_r5_extend20m.slurm` once both are done; regenerate all fig_R4/R5
 figures with the complete grid.
 
 ---
+
+### 2026-08-14 — Analytic linear (OU) ground truth: shared-input FPs vanish under full observation
+
+**Question (from the professor):** a fully-observed regression should condition
+on everything, so shared-input confounding shouldn't survive full observation
+in principle — if it does (Way 2, `n1250_r4`), that argues the LIF network's
+nonlinearity (or the calcium pipeline) is the real cause, not a fundamental
+limit of regression. Test: swap in a ground truth that's genuinely, exactly
+linear, and see if the Way 2 pattern goes away.
+
+**Method:** `scripts/ou_linear_ground_truth.py`. Same connectivity as
+`best_moments/n1250r4/adj_true.npy`, but the dynamics are a multivariate OU
+process (`dx = A x dt + dW`, `A = -I/tau + s*G`, `G = adj_true.T`, s chosen for
+a 20% stability margin) instead of spiking LIF neurons. Stationary `Cxx` and
+lagged `Cyx` (lag = 0.1τ) are solved **analytically** (continuous Lyapunov
+equation + matrix exponential) — no simulation, no finite-sample noise at all,
+the cleanest possible version of "infinite data." Runs in ~10s locally, no
+cluster. Fed straight into the existing `fig_way2.py` / attribution pipeline,
+unmodified.
+
+**Result — direct comparison, same N=1250, same connectivity, same procedure:**
+
+| | LIF+calcium (real pipeline) | OU (exact linear) |
+|---|---|---|
+| 50% observed, FDR | 32.9% | 51.1% |
+| 50% observed, hidden-driver slope | rises (5.2e-5) | rises (3.7e-5) |
+| 50% observed, observed-driver slope | rises too (3.2e-5) | **flat/negative** (-1.2e-5) |
+| 100% observed, FDR | 30.6% | **4.7%** |
+| 100% observed, % FPs above true-negative median | 78% (28pp excess over chance) | **49% (~0pp excess — chance level)** |
+
+**Interpretation:** on the exactly-linear system, full observation makes the
+shared-input signature in false positives disappear almost completely (excess
+over chance goes from +28pp to ~0pp; FDR drops 6x). This is what the
+professor's argument predicts for a correctly-specified linear model — and
+it's the opposite of what we measured on the real LIF+calcium data, where the
+pattern persists at essentially the same strength whether 50% or 100% of the
+network is observed. So: regression *can* fully remove shared-input confounding
+under full observation, provided the model is actually linear and correctly
+specified. The residual confound seen on real data is therefore attributable to
+LIF nonlinearity and/or the single-lag/temporal-memory mismatch (see
+`docs/theory/shared_input_theoretical_grounding.md` §4-5, "confound is diffuse
+and multi-lag"), not to a fundamental inability of full-state regression to
+remove shared input. Directly supports testing the joint multi-lag estimator
+(`scripts/multilag_estimator.py`, built 2026-08-04, never run) and/or a
+PIF/high-input-resistance spiking network as the next disambiguating step.
+
+Even at 50% observed, note the interesting asymmetry: OU's *observed*-driver
+slope is flat/negative (textbook — OLS conditions it away), while the real
+data's observed-driver slope still rises almost as much as its hidden-driver
+slope. That contrast, present even at 50% observed, is the same story in
+miniature.
+
+---
