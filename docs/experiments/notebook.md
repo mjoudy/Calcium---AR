@@ -76,6 +76,55 @@ which params were held fixed.
 **Next:** follow-up ideas.
 -->
 
+### 2026-08-15 — R.8 false positives split by reverse-direction truth: the "~1%" conflation caveat was ~10x too small
+
+**Question:** the R.8 symmetry write-up already flagged a caveat — a "false
+positive" A[i,j] only checks whether THIS direction (j->i) is a true edge, not
+whether the REVERSE direction A[j,i] (i->j, a different synapse) is. If the
+reverse direction is itself real, this isn't a genuine fake, it's a true edge
+caught on the wrong side of a near-symmetric pair. That caveat guessed the
+size at "~1%" — how big is it actually?
+
+**Setup:** `fig_r8_compute.py` now also loads `adj[i,j]` (truth of the
+reverse direction) alongside the existing `adj[j,i]` (truth of this
+direction), and splits each false-positive class in two: `_FF` (neither
+direction real — a genuine fake) vs `_FT` (this direction empty, reverse
+direction real — a mirrored true edge). No new simulation, reused the
+already-longest cached checkpoints (N=1250 @ 20M ms, N=12500 @ 10M ms, both
+since extended past the original R.8 500k/5M-ms runs by the R.4 work). New
+plot: `scripts/fig_r8_violin_fpsplit.py` -> `fig_R8_violin_fpsplit_n{1250,12500}`.
+
+**Result:**
+
+| | N=1250 | N=12500 |
+|---|---|---|
+| FT share of all E false positives | 11.6% | 11.5% |
+| FT share of all I false positives | 14.8% | 11.1% |
+| FF asym (mean, median) — genuine fakes | 0.08, 0.06 | 0.19, 0.14 |
+| FT asym (mean, median) — mirrored true edges | 0.73, 1.00 | 0.55, 0.35 |
+| true-edge asym (mean, median), for reference | 0.80–0.94, 0.90–1.00 | 0.68–0.94, 0.70–1.00 |
+| E-precision now -> if FT credited as correct | 0.761 -> 0.789 | 0.608 -> 0.653 |
+| I-precision now -> if FT credited as correct | 0.884 -> 0.901 | 0.550 -> 0.600 |
+
+**Conclusion:** the two things lumped into one "false positive" bucket are
+directionally opposite. Genuine fakes (FF) are strongly symmetric — matches
+the shared-input signature exactly, and is what the R.8 symmetry filter is
+correctly targeting. Mirrored true edges (FT) look like true edges, not noise
+(asym close to the true-edge distribution) — filtering by symmetry mostly
+leaves them alone, which is reassuring for that filter. The size is stable
+across a 10x range in N (~11-15%, both E and I, both network sizes) —
+**this is a real, consistent ~10x correction to the earlier "~1%" guess**, not
+noise or an N-dependent artifact. Precision bump from crediting FT is modest
+(+0.02 to +0.05) — doesn't change any headline conclusion, but the report's
+methods/caveats section should cite ~11-15%, not ~1%, if this conflation is
+mentioned. Memory (`shared_input_findings.md`) updated to match.
+
+**Next:** none outstanding — this was a scoped diagnostic, not a fix. Could
+in principle use the FT/FF split as a 3-way (not just binary) confidence
+label per edge, but that's report-framing, not new compute.
+
+---
+
 ### 2026-08-11 — Checked the professor's own papers: they use fixed probability, not fixed in-degree
 **Question:** given fixed in-degree is the more biologically-motivated scaling
 convention (see 2026-08-10 discussion), does the professor's own published
