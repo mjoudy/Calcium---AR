@@ -99,7 +99,10 @@ def main():
     ax.set(ylabel=ylabel, ylim=(0, 1.12))
     ax.grid(True, axis="y", color=fs.GRID, lw=0.6); ax.set_axisbelow(True)
     fs.despine(ax)
-    ax.set_title(f"False positives split by reverse-direction truth, N={N} (single-lag OLS)\n"
+    method = str(z["method"]) if "method" in z.files else "ols"
+    strength = str(z["strength"]) if "strength" in z.files else None
+    method_lab = method.upper() if strength is None else f"{method} ({strength} λ)"
+    ax.set_title(f"False positives split by reverse-direction truth, N={N} ({method_lab})\n"
                  "hatched = this \"false positive\" is actually a real synapse in the OTHER direction",
                  fontsize=11.5, color=fs.INK)
     fs.save(fig, args.out)

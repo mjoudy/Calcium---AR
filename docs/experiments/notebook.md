@@ -76,6 +76,75 @@ which params were held fixed.
 **Next:** follow-up ideas.
 -->
 
+### 2026-08-15 — Professor's hypothesis test: are R.8's false positives just an OLS/L2 small-entries artifact?
+
+**Question:** professor's reaction to the first R.8 violin plot — he suspected
+the false positives might be a side effect of OLS (L2 loss, never zeros
+anything) producing a cloud of small nonzero entries, not a genuine
+shared-input confound. He suggested testing this by splitting the violins by
+reverse-direction truth (the FF/FT split above) and comparing against a
+regularized (L1/Lasso) estimator.
+
+**Setup:** `scripts/fig_r8_compute_regularized.py` (new) solves Lasso and
+Lasso+Dale directly from the cached N=1250 moments
+(`results/best_moments/n1250r4/{Cxx,Cyx}.npy`, T=500,000 ms — the only
+checkpoint with cached moments + a tuned lambda) via
+`calcium_ar.solvers.from_moments`. No resimulation, no cluster — solved
+locally, ~1 min/run. Two lambda points per method: "weak" (the R.5 sweep's
+best-E_rec choice, turns out to be ~98% dense — basically OLS) and "strong"
+(lam/lam_max~0.25, genuinely sparse at 4-5% density). Also re-ran OLS's own
+FF/FT split on the *same* T=500k moments (`r8_n1250r4_ols_same500k`) for a
+clean like-for-like comparison, alongside the existing T=20M ms OLS result.
+
+**Result:**
+
+| condition | E_false_FF median asym | E_false_FT median asym | E false-pos. count | E-precision |
+|---|---|---|---|---|
+| OLS, T=500k | 0.245 | 0.493 | 38,749 | 0.670 |
+| OLS, T=20M | 0.063 | 1.000 | 29,252 | 0.761 |
+| Lasso weak (~98% dense) | 0.246 | 0.489 | 38,871 | 0.669 |
+| Lasso strong (4.5% dense) | **1.000** | 0.876 | 11,699 | 0.746 |
+| Lasso+Dale weak | 0.453 | 0.511 | 38,960 | 0.674 |
+| Lasso+Dale strong (4.1% dense) | **1.000** | 0.928 | 7,212 | 0.820 |
+
+Two findings, same conclusion from independent directions:
+
+1. **Weak L1 ≈ OLS, exactly** (0.246 vs 0.245) — confirms a barely-regularized
+   Lasso changes nothing, as expected.
+2. **Strong (genuinely sparse) L1 flips the signature completely**:
+   false positives stop looking symmetric (median asym 0.25 -> 1.00) and
+   look as directional as true edges. **This is NOT evidence the confound is
+   noise** — L1 is known to pick one predictor from a correlated group and
+   zero the rest (`sparsity_precision_finding.md`, "pure Lasso picks one of a
+   correlated group unstably across seeds"), which mechanically destroys the
+   OLS-style symmetric-smearing fingerprint without removing the underlying
+   correlated-input cause. Precision does improve with strong L1 (0.67->0.75
+   lasso, ->0.82 lasso+dale), consistent with the established L1
+   detection-precision trade-off — but neither approaches the OU-linear
+   ceiling, so the confound itself isn't resolved, just reshaped.
+3. **Independent evidence, same direction:** OLS's own symmetry signature
+   *sharpens* (0.245->0.063) as T grows 40x (500k->20M ms). Independent
+   per-entry noise would not systematically sharpen toward 0 with more data;
+   a real correlated bias would and does — this argues against the pure
+   floor-noise reading on its own, without even needing the Lasso comparison.
+
+**Conclusion — direct answer to the professor's question:** the false
+positives are not simply small-magnitude noise from OLS's L2 loss. The
+symmetric signature is real and gets *more* pronounced with more data (point
+3), and switching estimators doesn't make it disappear so much as change its
+shape (point 2) — from many weak symmetric entries (OLS) to fewer but
+arbitrarily-directional strong entries (strong L1), which is itself the
+signature of L1 resolving ties among correlated (shared-input-driven)
+predictors, not evidence there was no structure to resolve. Practical
+consequence: the R.8 symmetry-based false-positive filter is OLS-specific
+and won't transfer to a Lasso/Lasso+Dale pipeline as built.
+
+**Next:** none outstanding. If useful later: repeat at N=12500 (needs new
+moments cached + a fresh lambda sweep there, real cluster cost — not done,
+scope was N=1250 only per instruction).
+
+---
+
 ### 2026-08-15 — R.8 false positives split by reverse-direction truth: the "~1%" conflation caveat was ~10x too small
 
 **Question:** the R.8 symmetry write-up already flagged a caveat — a "false
