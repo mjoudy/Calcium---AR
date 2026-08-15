@@ -18,17 +18,21 @@
 # up. This job searches a few likely locations for it (below) before giving
 # up; if none match, either point ADJ_OVERRIDE at the right file when
 # submitting (`sbatch --export=ADJ_OVERRIDE=/path/to/adj_true.npy ...`) or,
-# only as a last resort, rsync the local copy up:
-#   rsync -av ~/calcium_results/best_moments/n1250r4/adj_true.npy \
-#     <cluster>:$(ws_find calcium_ar)/best_moments/n1250r4/
+# only as a last resort, rsync the local copy up. NOTE: $(ws_find ...) only
+# resolves on the cluster -- from your LOCAL machine use the literal
+# workspace path (this project's is /work/classic/fr_mj200-calcium_ar), not
+# $(ws_find calcium_ar), which would try (and fail) to run locally:
+#   rsync -avhz ~/calcium_results/best_moments/n1250r4/adj_true.npy \
+#     fr_mj200@login1.nemo.uni-freiburg.de:/work/classic/fr_mj200-calcium_ar/best_moments/n1250r4/
 #
-# Submit:  cd $(ws_find calcium_ar)/Calcium---AR
+# Submit (on the cluster, where $(ws_find ...) does resolve):
+#          cd $(ws_find calcium_ar)/Calcium---AR
 #          sbatch slurm/run_hawkes_ground_truth.slurm
 #
-# Then, locally:
-#   rsync -av <cluster>:$(ws_find calcium_ar)/results/hawkes_moments/n1250_calcium/ \
+# Then, from your LOCAL machine:
+#   rsync -avhz fr_mj200@login1.nemo.uni-freiburg.de:'/work/classic/fr_mj200-calcium_ar/results/hawkes_moments/n1250_calcium/' \
 #     ~/calcium_results/hawkes_moments/n1250_calcium/
-#   python scripts/fig_linearity_way2.py   # once wired up as a 4th source
+#   python scripts/fig_linearity_way2.py
 
 #SBATCH --job-name=ca_hawkes
 #SBATCH --partition=cpu
