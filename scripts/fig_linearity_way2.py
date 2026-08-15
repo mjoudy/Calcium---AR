@@ -40,6 +40,14 @@ DEFAULT_SOURCES = [
      str(Path(__file__).resolve().parent.parent / "results/wrapup_n1250pif_T100k/seed1"),
      "#e8a33d"),
     ("OU (exact linear)", "~/calcium_results/ou_moments/n1250_linear", "#c0392b"),
+    # tau_m x100 (2000ms), eta=80.0 from scripts/pif_tau_probe.py --stage x100
+    # (2026-08-15) -- CV=6.14 at this stage, much more irregular again than
+    # the x10 pilot's CV=1.94 (see the NETS["n1250_pif100"] comment in
+    # wrapup_run.py). Not yet computed -- populated by rsyncing back
+    # slurm/run_wrapup_n1250pif100.slurm's output; skipped automatically
+    # (with a printed note) until the directory exists.
+    ("PIF pilot (tau_m x100)", "~/calcium_results/wrapup_n1250pif100_T100k/seed1",
+     "#b8860b"),
     # Real point process (Pernice et al. 2011's own model class), same
     # topology as LIF/OU, run through the SAME calcium+deconvolution pipeline
     # as LIF/PIF -- unlike OU, which skips that pipeline entirely (see

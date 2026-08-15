@@ -126,6 +126,21 @@ NETS = {
     "n1250_pif": dict(n_excitatory=1000, n_inhibitory=250, J_ex=0.474, g=8.0,
                       eta=8.0, V_reset=10.0, tau_m=200.0, sim_time=100_000.0,
                       n_threads=8, lam_l1=1e-4, lam_l2=1e-4, name="wrapup_n1250pif"),
+    # --- PIF ladder continued: tau_m x100 (20ms -> 2000ms). eta re-tuned by
+    # scripts/pif_tau_probe.py --stage x100 (2026-08-15, sim_time=40000ms,
+    # properly stationary per the 20x-tau_m floor -- an earlier provisional
+    # probe at sim_time=4000ms is NOT what this eta comes from): eta=80.0 ->
+    # 14.8 Hz, sync 0.004, but CV=6.14 -- MUCH more irregular again than the
+    # x10 pilot's CV=1.94 (0.98 -> 1.94 -> 6.14 across x1/x10/x100). Expected
+    # direction (perfect integrators fire more irregularly under fluctuation-
+    # driven input, no leak to regularize ISIs) but the SIZE of the jump is
+    # worth flagging every time this arm is discussed -- single-neuron
+    # statistics are now far from realistic cortical AI (CV~1).
+    # SMALL-SCALE PILOT: sim_time matches n1250_pif's (100s = 50x tau_m, well
+    # past the stationarity floor); extend only if the signal looks worth it.
+    "n1250_pif100": dict(n_excitatory=1000, n_inhibitory=250, J_ex=0.474, g=8.0,
+                         eta=80.0, V_reset=10.0, tau_m=2000.0, sim_time=100_000.0,
+                         n_threads=8, lam_l1=1e-4, lam_l2=1e-4, name="wrapup_n1250pif100"),
     "n2500_r4": dict(n_excitatory=2000, n_inhibitory=500, J_ex=0.335, g=8.0,
                      eta=1.50, V_reset=10.0, sim_time=1_000_000.0, n_threads=8,
                      lam_l1=1e-4, lam_l2=1e-4, name="wrapup_n2500r4"),
