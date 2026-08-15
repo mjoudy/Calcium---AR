@@ -55,7 +55,12 @@ PIF_ETA = 8.0
 # ~0.6x factor observed going from x1 -> x10 (see module docstring) -- wide on
 # purpose since the correction factor itself is not known to hold further out.
 STAGES = {
-    "x100":   dict(tau_m=BASE_TAU_M * 100,   etas=[20, 30, 45, 65, 90, 120, 160, 200]),
+    # x100 grid NARROWED 2026-08-15 from a first coarse pass (etas 20-200,
+    # sim_time=4000ms, which triggered the sim_time<20*tau_m warning below --
+    # its eta=90 pick is NOT trusted): target 14Hz bracketed between eta=65
+    # (12.0Hz) and eta=90 (15.7Hz). Re-centered here, now run at a trustworthy
+    # sim_time (auto-scaled by --sim-time's default, see main()).
+    "x100":   dict(tau_m=BASE_TAU_M * 100,   etas=[60, 68, 75, 80, 85, 92, 100, 110]),
     "x1000":  dict(tau_m=BASE_TAU_M * 1000,  etas=[150, 250, 400, 600, 900, 1300, 1800, 2500]),
     "x10000": dict(tau_m=BASE_TAU_M * 10000, etas=[800, 1500, 2500, 4000, 6000, 9000, 13000, 18000]),
 }
@@ -68,8 +73,11 @@ def main():
     ap.add_argument("--tau-m", type=float, default=None, help="ms")
     ap.add_argument("--etas", type=float, nargs="+", default=None)
     ap.add_argument("--target", type=float, default=14.0, help="target rate (Hz), matches n1250_r4")
-    ap.add_argument("--sim-time", type=float, default=4000.0)
-    ap.add_argument("--warmup-ms", type=float, default=1000.0)
+    ap.add_argument("--sim-time", type=float, default=None,
+                    help="ms; default auto-scales to 20x tau_m (the script's own "
+                         "stationarity floor) unless given explicitly")
+    ap.add_argument("--warmup-ms", type=float, default=None,
+                    help="ms; default auto-scales to 5x tau_m unless given explicitly")
     ap.add_argument("--n-threads", type=int, default=8)
     args = ap.parse_args()
 
@@ -80,6 +88,21 @@ def main():
         if args.tau_m is None or args.etas is None:
             raise SystemExit("pass --stage, or both --tau-m and --etas")
         tau_m, etas = args.tau_m, args.etas
+
+    # Auto-scale so the stationarity warning below doesn't just keep firing at
+    # every stage -- 20x/5x are the same multiples the warning itself checks.
+    sim_time = args.sim_time if args.sim_time is not None else max(4000.0, 20 * tau_m)
+    warmup_ms = args.warmup_ms if args.warmup_ms is not None else max(1000.0, 5 * tau_m)
+    args.sim_time, args.warmup_ms = sim_time, warmup_ms
+
+    # Rough cost heads-up before committing: this run's own eta=90 point did
+    # 4000ms in 0.2s wall (8 threads) -- extrapolate linearly, serial over the
+    # eta grid. Very approximate; NEST startup overhead means small sim_times
+    # are relatively more expensive than this suggests.
+    est_wall_s = len(etas) * sim_time * (0.2 / 4000.0)
+    print(f"{len(etas)} eta points x sim_time={sim_time:.0f}ms  "
+          f"(rough serial estimate: ~{est_wall_s:.0f}s wall, extrapolated from "
+          f"today's x100 probe -- treat as order-of-magnitude only)\n", flush=True)
 
     if args.sim_time < 20 * tau_m:
         print(f"WARNING: sim_time={args.sim_time:.0f}ms is only "
