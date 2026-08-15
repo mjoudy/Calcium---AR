@@ -32,6 +32,10 @@ DEFAULT_SOURCES = [
      str(Path(__file__).resolve().parent.parent / "results/wrapup_n1250pif_T100k/seed1"),
      "#e8a33d"),
     ("OU (exact linear)", "~/calcium_results/ou_moments/n1250_linear", "#c0392b"),
+    ("PIF pilot (tau_m x100)", "~/calcium_results/wrapup_n1250pif100_T100k/seed1",
+     "#b8860b"),
+    ("Hawkes (linear, real spikes)", "~/calcium_results/hawkes_moments/n1250_calcium_tuned",
+     "#2ca02c"),
 ]
 
 
@@ -96,6 +100,9 @@ def main():
     for ax, obs_frac, title in zip(axes, [0.5, 1.0],
                                     ["50% observed", "100% observed"]):
         for label, path, color in DEFAULT_SOURCES:
+            if not (Path(path).expanduser() / "Cxx.npy").exists():
+                print(f"[skip] {label} @ {title}: no data yet at {path}")
+                continue
             xs, rate = one_curve(path, obs_frac, args.density, args.min_n, args.seed)
             if len(xs) == 0:
                 print(f"[skip] {label} @ {title}: no bins with >= {args.min_n} non-edges")

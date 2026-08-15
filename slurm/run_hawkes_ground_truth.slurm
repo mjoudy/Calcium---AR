@@ -30,9 +30,22 @@
 #          sbatch slurm/run_hawkes_ground_truth.slurm
 #
 # Then, from your LOCAL machine:
-#   rsync -avhz fr_mj200@login1.nemo.uni-freiburg.de:'/work/classic/fr_mj200-calcium_ar/results/hawkes_moments/n1250_calcium/' \
-#     ~/calcium_results/hawkes_moments/n1250_calcium/
+#   rsync -avhz fr_mj200@login1.nemo.uni-freiburg.de:'/work/classic/fr_mj200-calcium_ar/results/hawkes_moments/n1250_calcium_tuned/' \
+#     ~/calcium_results/hawkes_moments/n1250_calcium_tuned/
 #   python scripts/fig_linearity_way2.py
+#
+# RECALIBRATED 2026-08-15: the first version (rate0=10Hz default, margin=0.3)
+# came back with AUC=0.54 (barely above chance) -- the analytic zero-noise
+# check showed margin=0.3 already has the BEST relative true/non-edge
+# separation of the margins tried (stronger coupling dilutes it further, more
+# indirect-path contribution per Pernice's own math), so the fix is not more
+# coupling -- it's rate. Hawkes realizes only ~6.1Hz at rate0=10Hz vs LIF's
+# ~14.8Hz, i.e. much less averaging for the SAME calcium noise floor.
+# Realized rate scales linearly with rate0 (y=(1-G)^-1 y0), so rate0=24.3
+# lands at ~14.2-14.3Hz -- verified locally (both stages): mean rate 14.23Hz,
+# matches the closed-form Eq.10 prediction (14.07/14.20 Hz E/I) closely.
+# Old (untuned) result kept at .../hawkes_moments/n1250_calcium for reference
+# -- this run writes to a separate _tuned path, does not overwrite it.
 
 #SBATCH --job-name=ca_hawkes
 #SBATCH --partition=cpu
@@ -77,11 +90,12 @@ fi
 echo "using adj_true.npy: $ADJ"
 
 "$PY" scripts/hawkes_ground_truth.py \
-  --adj "$ADJ" --out "$WS/hawkes_events/n1250" --sim-time 100000 --seed 1
+  --adj "$ADJ" --out "$WS/hawkes_events/n1250_tuned" --sim-time 100000 \
+  --rate0 24.3 --margin 0.30 --seed 1
 
 "$PY" scripts/hawkes_to_moments.py \
-  --events-dir "$WS/hawkes_events/n1250" \
-  --out "$WS/results/hawkes_moments/n1250_calcium" \
+  --events-dir "$WS/hawkes_events/n1250_tuned" \
+  --out "$WS/results/hawkes_moments/n1250_calcium_tuned" \
   --seed 1
   # chunk-ms left at the script default (10s, matches wrapup_run_stream.py's
   # own default) -- an earlier run here passed --chunk-ms 2000 as an extra RAM

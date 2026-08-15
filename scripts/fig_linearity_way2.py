@@ -54,7 +54,7 @@ DEFAULT_SOURCES = [
     # scripts/hawkes_ground_truth.py / hawkes_to_moments.py). Not yet computed
     # locally -- populated by rsyncing back slurm/run_hawkes_ground_truth.slurm's
     # output; skipped automatically (with a printed note) until the directory exists.
-    ("Hawkes (linear, real spikes)", "~/calcium_results/hawkes_moments/n1250_calcium",
+    ("Hawkes (linear, real spikes)", "~/calcium_results/hawkes_moments/n1250_calcium_tuned",
      "#2ca02c"),
 ]
 
