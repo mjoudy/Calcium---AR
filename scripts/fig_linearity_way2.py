@@ -40,6 +40,14 @@ DEFAULT_SOURCES = [
      str(Path(__file__).resolve().parent.parent / "results/wrapup_n1250pif_T100k/seed1"),
      "#e8a33d"),
     ("OU (exact linear)", "~/calcium_results/ou_moments/n1250_linear", "#c0392b"),
+    # Real point process (Pernice et al. 2011's own model class), same
+    # topology as LIF/OU, run through the SAME calcium+deconvolution pipeline
+    # as LIF/PIF -- unlike OU, which skips that pipeline entirely (see
+    # scripts/hawkes_ground_truth.py / hawkes_to_moments.py). Not yet computed
+    # locally -- populated by rsyncing back slurm/run_hawkes_ground_truth.slurm's
+    # output; skipped automatically (with a printed note) until the directory exists.
+    ("Hawkes (linear, real spikes)", "~/calcium_results/hawkes_moments/n1250_calcium",
+     "#2ca02c"),
 ]
 
 
@@ -106,6 +114,9 @@ def main():
     for ax, obs_frac, title in zip(axes, [0.5, 1.0],
                                     ["50% observed", "100% observed"]):
         for label, path, color in DEFAULT_SOURCES:
+            if not (Path(path).expanduser() / "Cxx.npy").exists():
+                print(f"[skip] {label} @ {title}: no data yet at {path}")
+                continue
             xs, pct = one_curve(path, obs_frac, args.density, args.min_n, args.seed)
             if len(xs) == 0:
                 print(f"[skip] {label} @ {title}: no bins with >= {args.min_n} pairs")
