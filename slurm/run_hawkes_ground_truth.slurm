@@ -78,6 +78,11 @@ echo "using adj_true.npy: $ADJ"
 "$PY" scripts/hawkes_to_moments.py \
   --events-dir "$WS/hawkes_events/n1250" \
   --out "$WS/results/hawkes_moments/n1250_calcium" \
-  --chunk-ms 2000 --seed 1
+  --seed 1
+  # chunk-ms left at the script default (10s, matches wrapup_run_stream.py's
+  # own default) -- an earlier run here passed --chunk-ms 2000 as an extra RAM
+  # margin the 96G job never needed, and that starved the one-time first-chunk
+  # tau estimate (came out -330ms instead of ~+100ms, silently broke the
+  # deconvolution). 96G has plenty of headroom at the default chunk size.
 
 echo "done: $(date)"

@@ -86,10 +86,23 @@ def main():
         checkpoints_samples=[checkpoint], chunk_samples=chunk_samples, seed=args.seed,
     )
     Cxx, Cyx = moments[checkpoint]
-    tau_str = (f"{np.mean(tau_est):.1f}ms (mean over {np.size(tau_est)} neurons)"
-               if np.ndim(tau_est) else f"{float(tau_est):.1f}ms")
+    tau_mean = float(np.mean(tau_est))
+    tau_str = (f"{tau_mean:.1f}ms (mean over {np.size(tau_est)} neurons)"
+               if np.ndim(tau_est) else f"{tau_mean:.1f}ms")
     print(f"moments built. mean rate {rate:.2f} Hz, estimated calcium tau {tau_str}",
           flush=True)
+    # The tau estimate is fit ONCE, from the first chunk only (see
+    # stream_moments) -- if that chunk is too short (--chunk-ms too small) or
+    # otherwise unrepresentative, the RANSAC fit can come out negative or wildly
+    # off, silently feeding a broken deconvolution into everything downstream.
+    # It should land near --tau (the value used to GENERATE the calcium signal
+    # in the first place); flag loudly rather than let a bad run look normal.
+    if tau_mean <= 0 or not (0.3 * args.tau <= tau_mean <= 3.0 * args.tau):
+        print(f"WARNING: estimated tau ({tau_mean:.1f}ms) is far from the true "
+              f"generative tau ({args.tau:.1f}ms) -- the deconvolution step likely "
+              f"broke (e.g. --chunk-ms too small for the one-time tau fit to have "
+              f"enough data). Treat Cxx/Cyx/downstream A as UNRELIABLE until "
+              f"rerun with a larger --chunk-ms.", flush=True)
 
     out = Path(args.out).expanduser()
     out.mkdir(parents=True, exist_ok=True)
