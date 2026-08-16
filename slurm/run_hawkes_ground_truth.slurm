@@ -104,7 +104,13 @@ echo "using adj_true.npy: $ADJ"
 "$PY" scripts/hawkes_to_moments.py \
   --events-dir "$WS/hawkes_events/n1250_recal" \
   --out "$WS/results/hawkes_moments/n1250_calcium_recal" \
-  --seed 1
+  --seed 1 --known-tau
+  # --known-tau: skip RANSAC estimation, use the true generative tau (100ms)
+  # directly -- valid here since this is synthetic data with a KNOWN true
+  # calcium decay. RANSAC kept landing far from the true value unpredictably
+  # across runs (-330ms, +148ms, +54ms, -1286ms), silently corrupting
+  # deconvolution each time. See calcium_ar/experiments/streaming.py's
+  # known_tau parameter.
   # chunk-ms left at the script default (10s, matches wrapup_run_stream.py's
   # own default) -- an earlier run here passed --chunk-ms 2000 as an extra RAM
   # margin the 96G job never needed, and that starved the one-time first-chunk

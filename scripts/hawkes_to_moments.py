@@ -59,6 +59,12 @@ def main():
     ap.add_argument("--chunk-ms", type=float, default=DEFAULTS["chunk_ms"])
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--density", type=float, default=0.10, help="for the quick OLS sanity check")
+    ap.add_argument("--known-tau", action="store_true",
+                    help="skip RANSAC estimation, use --tau directly for deconvolution -- "
+                         "valid here because this is synthetic data with a KNOWN true "
+                         "calcium decay (we generated it), unlike real/LIF data. RANSAC "
+                         "kept landing far from the true value unpredictably on Hawkes "
+                         "signals (-330/+148/+54/-1286ms across similar runs).")
     args = ap.parse_args()
 
     d = Path(args.events_dir).expanduser()
@@ -84,6 +90,7 @@ def main():
         sigma_intra=args.sigma_intra, sigma_extra=args.sigma_extra,
         smooth_win=smooth_win, tau_method=args.tau_method,
         checkpoints_samples=[checkpoint], chunk_samples=chunk_samples, seed=args.seed,
+        known_tau=(args.tau if args.known_tau else None),
     )
     Cxx, Cyx = moments[checkpoint]
     tau_mean = float(np.mean(tau_est))

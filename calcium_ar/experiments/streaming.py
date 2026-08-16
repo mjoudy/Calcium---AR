@@ -205,9 +205,18 @@ def stream_moments(
     lags: list[int] | None = None,
     raw_calcium: bool = False,
     signal: str = "feed",
+    known_tau: float | None = None,
 ):
     """Stream calcium -> feed in chunks from a *run* BrunelNetwork (densify=False)
     and accumulate moments, snapshotting at each checkpoint (in samples).
+
+    known_tau: skip the one-time RANSAC estimate and use this value directly
+    for deconvolution. Only valid for SYNTHETIC ground truth where the true
+    calcium decay is known exactly (e.g. Hawkes arms, generated with a known
+    `tau`) -- real/LIF data must still estimate it. Added because RANSAC kept
+    landing far from the true tau on Hawkes-generated signals in a way that
+    varied unpredictably run to run (-330ms, +148ms, +54ms, -1286ms across
+    otherwise-similar runs) and silently corrupted the deconvolution each time.
 
     Returns (moments, tau_est, mean_rate_hz) where moments maps
     checkpoint_samples -> (Cxx, Cyx)."""
@@ -328,10 +337,13 @@ def stream_moments(
             F = C
             F += rng.standard_normal((N, L), dtype=np.float32) * f32(sigma_extra)
         if tau_est is None:
-            tau_np = F.cpu().numpy() if device else F
-            tau_est = estimate_tau_robust(tau_np, window_length=smooth_win,
-                                          method=tau_method, dt=dt)
-            del tau_np
+            if known_tau is not None:
+                tau_est = float(known_tau)
+            else:
+                tau_np = F.cpu().numpy() if device else F
+                tau_est = estimate_tau_robust(tau_np, window_length=smooth_win,
+                                              method=tau_method, dt=dt)
+                del tau_np
         # raw_calcium=True: accumulate moments on the fluorescence F directly (no
         # deconvolution), for the preprocessing-effect comparison. Otherwise
         # deconvolve chunk -> feed (per-chunk; boundary error negligible for large
