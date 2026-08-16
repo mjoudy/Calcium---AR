@@ -1,23 +1,22 @@
 """
-Way 2, three ground truths side by side: does false-positive strength still
-grow with shared-driver exposure as the generative process gets more linear?
+Way 2: does false-positive strength still grow with shared-driver exposure as
+the generative process gets more linear?
 
 Same procedure as fig_way2.py (observe a fraction S, OLS-solve, threshold to
 top-density |weight|, find false positives, bin against # common presynaptic
-drivers) run identically on three different ground truths at N=1250:
-  - LIF (real spiking + calcium)      best_moments/n1250r4
-  - PIF pilot (tau_m x10, still spiking)  results/wrapup_n1250pif_T100k/seed1
-  - OU (exact linear, analytic moments)   ou_moments/n1250_linear
+drivers) run identically on ground truths of increasing linearity at N=1250:
+  - LIF (real spiking + calcium)          best_moments/n1250r4
+  - PIF pilot (tau_m x10/x100, still spiking)  results/wrapup_n1250pif*_T100k
+  - Hawkes (linear point process + calcium)    hawkes_moments/n1250_calcium_recal
 
 Plotted as %% change in mean false-positive |weight| from the lowest driver-
-count bin (not raw |weight| -- the three ground truths have incomparable raw
-units/scales, calcium signal vs abstract linear units) so the three curves sit
+count bin (not raw |weight| -- the ground truths have incomparable raw
+units/scales, calcium signal vs abstract linear units) so the curves sit
 on one shared, meaningful y-axis. Two panels: 50%% and 100%% observed.
 
-Caveat: LIF and OU share the exact same adjacency (OU was built from LIF's
-adj_true directly); PIF has its own independently-drawn random topology at
-the same target density -- so this compares the same STATISTICAL structure,
-not pair-for-pair identical graphs.
+Caveat: LIF/Hawkes share the exact same adjacency; PIF has its own
+independently-drawn random topology at the same target density -- so this
+compares the same STATISTICAL structure, not pair-for-pair identical graphs.
 
 Usage:
   python scripts/fig_linearity_way2.py --out figures/fig_linearity_way2
@@ -35,26 +34,20 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import figstyle as fs
 
 DEFAULT_SOURCES = [
-    ("LIF (real)", "~/calcium_results/best_moments/n1250r4", "#2a78d6"),
+    ("LIF", "~/calcium_results/best_moments/n1250r4", "#2a78d6"),
     ("PIF pilot (tau_m x10)",
      str(Path(__file__).resolve().parent.parent / "results/wrapup_n1250pif_T100k/seed1"),
      "#e8a33d"),
-    ("OU (exact linear)", "~/calcium_results/ou_moments/n1250_linear", "#c0392b"),
     # tau_m x100 (2000ms), eta=80.0 from scripts/pif_tau_probe.py --stage x100
     # (2026-08-15) -- CV=6.14 at this stage, much more irregular again than
     # the x10 pilot's CV=1.94 (see the NETS["n1250_pif100"] comment in
-    # wrapup_run.py). Not yet computed -- populated by rsyncing back
-    # slurm/run_wrapup_n1250pif100.slurm's output; skipped automatically
-    # (with a printed note) until the directory exists.
+    # wrapup_run.py).
     ("PIF pilot (tau_m x100)", "~/calcium_results/wrapup_n1250pif100_T100k/seed1",
      "#b8860b"),
-    # Real point process (Pernice et al. 2011's own model class), same
-    # topology as LIF/OU, run through the SAME calcium+deconvolution pipeline
-    # as LIF/PIF -- unlike OU, which skips that pipeline entirely (see
-    # scripts/hawkes_ground_truth.py / hawkes_to_moments.py). Not yet computed
-    # locally -- populated by rsyncing back slurm/run_hawkes_ground_truth.slurm's
-    # output; skipped automatically (with a printed note) until the directory exists.
-    ("Hawkes (linear, real spikes)", "~/calcium_results/hawkes_moments/n1250_calcium_recal",
+    # Real point process (Pernice et al. 2011's own model class), run through
+    # the SAME calcium+deconvolution pipeline as LIF/PIF (see
+    # scripts/hawkes_ground_truth.py / hawkes_to_moments.py).
+    ("Hawkes", "~/calcium_results/hawkes_moments/n1250_calcium_recal",
      "#2ca02c"),
 ]
 

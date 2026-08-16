@@ -27,14 +27,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import figstyle as fs
 
 DEFAULT_SOURCES = [
-    ("LIF (real)", "~/calcium_results/best_moments/n1250r4", "#2a78d6"),
+    ("LIF", "~/calcium_results/best_moments/n1250r4", "#2a78d6"),
     ("PIF pilot (tau_m x10)",
      str(Path(__file__).resolve().parent.parent / "results/wrapup_n1250pif_T100k/seed1"),
      "#e8a33d"),
-    ("OU (exact linear)", "~/calcium_results/ou_moments/n1250_linear", "#c0392b"),
     ("PIF pilot (tau_m x100)", "~/calcium_results/wrapup_n1250pif100_T100k/seed1",
      "#b8860b"),
-    ("Hawkes (linear, real spikes)", "~/calcium_results/hawkes_moments/n1250_calcium_recal",
+    ("Hawkes", "~/calcium_results/hawkes_moments/n1250_calcium_recal",
      "#2ca02c"),
 ]
 

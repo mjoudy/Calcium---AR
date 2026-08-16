@@ -31,11 +31,10 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 SOURCES = [
-    ("LIF (real)", "~/calcium_results/best_moments/n1250r4"),
+    ("LIF", "~/calcium_results/best_moments/n1250r4"),
     ("PIF pilot (tau_m x10)", str(ROOT / "results/wrapup_n1250pif_T100k/seed1")),
-    ("OU (exact linear)", "~/calcium_results/ou_moments/n1250_linear"),
     ("PIF pilot (tau_m x100)", "~/calcium_results/wrapup_n1250pif100_T100k/seed1"),
-    ("Hawkes + calcium (linear)", "~/calcium_results/hawkes_moments/n1250_calcium_recal"),
+    ("Hawkes", "~/calcium_results/hawkes_moments/n1250_calcium_recal"),
 ]
 
 

@@ -33,25 +33,22 @@ from calcium_ar.solvers.from_moments import ols_from_moments
 # Same arms, same colours as fig_linearity_way2.py -- deliberately kept in
 # sync so the two figures read as one connected story.
 SOURCES = [
-    ("LIF (real)", "~/calcium_results/best_moments/n1250r4", "#2a78d6"),
+    ("LIF", "~/calcium_results/best_moments/n1250r4", "#2a78d6"),
     ("PIF pilot (tau_m x10)", str(ROOT / "results/wrapup_n1250pif_T100k/seed1"), "#e8a33d"),
-    ("OU (exact linear)", "~/calcium_results/ou_moments/n1250_linear", "#c0392b"),
     ("PIF pilot (tau_m x100)", "~/calcium_results/wrapup_n1250pif100_T100k/seed1", "#b8860b"),
-    ("Hawkes + calcium (linear)", "~/calcium_results/hawkes_moments/n1250_calcium_recal", "#2ca02c"),
+    ("Hawkes", "~/calcium_results/hawkes_moments/n1250_calcium_recal", "#2ca02c"),
 ]
 
 # Rate/CV aren't derivable from Cxx/Cyx alone (need raw spike trains, not
 # cached for every arm locally) -- these are measured, documented values from
 # this project's own runs (wrapup_run.py NETS comments; PIF pilot probes;
 # scripts/hawkes_ground_truth.py rate check + local ISI-CV measurement for
-# Hawkes). OU has no rate/CV -- it's a continuous process, not a point
-# process, so "firing rate" and "ISI" don't apply; shown as n/a rather than 0.
+# Hawkes).
 RATE_CV = {
-    "LIF (real)": (14.8, 0.98),
+    "LIF": (14.8, 0.98),
     "PIF pilot (tau_m x10)": (13.7, 1.94),
     "PIF pilot (tau_m x100)": (14.8, 6.14),
-    "OU (exact linear)": (None, None),
-    "Hawkes + calcium (linear)": (14.5, 1.05),
+    "Hawkes": (14.5, 1.05),
 }
 
 
