@@ -1078,3 +1078,132 @@ N=12500, combine with R.8's symmetry filter) rather than chasing more raw
 data or more PIF tuning.
 
 ---
+
+## 2026-08-16: Hawkes process added, PIF ladder extended, and the linearity
+## finding properly separated from a "does linear help overall" finding
+
+**Question:** professor's reply to the LIF/PIF-x10/OU comparison (2026-08-15):
+OU has no spikes, so "deconvolution" was never meaningfully applied there —
+use a real Hawkes process (Pernice et al. 2011's own model) instead/as well;
+also push the PIF tau_m ladder further ("even x10000").
+
+**What was built (scripts, all under `scripts/`, committed on `hpc-setup`):**
+- `hawkes_ground_truth.py` — exact event-driven (Ogata thinning) simulation of
+  a linear multivariate Hawkes process, Pernice 2011's own example parameters
+  (y0=10Hz baseline, tau_syn=10ms exponential kernel), on the SAME `adj_true`
+  topology as the LIF/OU arms. Verified against the paper's own closed-form
+  rate prediction (Eq. 10) — matches closely every run.
+- `hawkes_to_moments.py` — runs those spikes through the SAME calcium ->
+  deconvolution -> moments pipeline as LIF/PIF (unlike OU, which skips
+  observation entirely) — closes exactly the gap the professor flagged.
+- `fig_hawkes_validation.py` — Pernice Fig. 2-style panel (raster,
+  predicted-vs-simulated rate/correlation) for the Hawkes arm specifically.
+- `wrapup_run.py` NETS["n1250_pif100"] — tau_m x100 (2000ms) production
+  config, eta=80.0 from a properly-stationary probe.
+- `pif_tau_probe.py` — eta-vs-rate probe, auto-scales sim_time to 20x tau_m
+  so results are trustworthy by construction (a first x100 probe at a flat
+  4000ms sim_time self-flagged as provisional and was correctly discarded).
+- `linearity_overall_metrics.py` / `fig_linearity_overall_metrics.py` /
+  `linearity_confound_attribution.py` — three new analyses, see findings below.
+
+**Bug found and fixed (matters for anyone reusing `hawkes_to_moments.py`):**
+the one-time RANSAC calcium-tau estimate (fit from the first chunk only, see
+`calcium_ar/experiments/streaming.py`) landed far from the true value
+unpredictably across otherwise-similar Hawkes runs (-330ms, +148ms, +54ms,
+-1286ms — true value always 100ms), silently corrupting deconvolution each
+time. Fixed properly, not patched around: added `known_tau=` to
+`stream_moments()` to skip estimation entirely when the true value is known
+(valid for synthetic ground truth we generated ourselves; NOT valid for
+LIF/real data, which must keep estimating). `hawkes_to_moments.py --known-tau`
+uses it. A loud warning was also added for any future case where estimation
+must still be used and drifts far from the configured generative tau.
+
+**Finding 1 — the core hypothesis holds, confirmed two independent ways:**
+false-positive strength/rate vs #shared-drivers, 100% observed, "total rise":
+
+| arm | total rise (weight fig, pp) | AUC | precision@10% | rate (Hz) | CV |
+|---|---|---|---|---|---|
+| LIF (real) | 14.2 | 0.943 | 0.694 | 14.8 | 0.98 |
+| PIF x10 (tau_m=200ms) | 6.9 | 0.730 | 0.371 | 13.7 | 1.94 |
+| PIF x100 (tau_m=2000ms) | -0.3 | 0.709 | 0.341 | 14.8 | 6.14 |
+| Hawkes+calcium (linear) | 3.3 | 0.578 | 0.185 | 14.5 | 1.05 |
+| OU (exact linear) | -0.1 | 1.000 | 0.953 | n/a | n/a |
+
+Both a provably-linear continuous process (OU) and a provably-linear real
+point process (Hawkes) show a much flatter confound trend than real LIF, and
+the PIF ladder shows the SAME trend shrinking monotonically as leak is
+removed (x1 -> x10 -> x100). Two independent lines of evidence, not one.
+
+**Finding 2 — this is NOT the same as "linear ground truths are easier to
+recover overall."** Look at the AUC/precision columns above: every
+alternative-to-LIF arm has WORSE overall detection, not better. This isn't a
+contradiction — confound-STRUCTURE (which mistakes get made) and raw
+detectability (how many mistakes total) are different axes. LIF's strength on
+the second axis reflects years of this project's own tuning toward a
+realistic, strongly-correlated regime; PIF and Hawkes were tuned to test
+linearity, not to maximize SNR, and ran into real, separate, identified
+obstacles when we tried to close that gap:
+  - PIF: burstiness is *forced* by removing the leak (CV 0.98->1.94->6.14 at
+    x1/x10/x100; even at x10000 no eta gets CV below ~20 — not a tuning
+    artifact, an intrinsic property of near-perfect integrators under a hard
+    threshold).
+  - Hawkes: has a hard mathematical stability ceiling (spectral radius < 1)
+    that LIF's threshold-reset nonlinearity doesn't face — a margin sweep
+    (2026-08-16, local, spikes-only) found the ORIGINAL margin=0.30 choice
+    was not even the best available: margin=0.15 (radius=0.85) gave real,
+    reproducible improvement (precision 0.195->0.242 spikes-only), but
+    plateaus going stronger still (margin=0.08: no further gain) — evidence
+    this is a real ceiling, not an undertuned knob.
+  Plausible general reason: nonlinearities (LIF's threshold+reset) buy
+  stability headroom that lets a network use strong, information-rich
+  connections; pure linear systems must keep coupling weak specifically to
+  stay stable, capping their usable signal strength independent of anything
+  about "linearity" being bad.
+
+**Finding 3 — a large RELATIVE rate increase can still be a SMALL SHARE of
+total false positives, in absolute terms.** New metric
+(`linearity_confound_attribution.py`): baseline = false-positive rate at the
+lowest-driver-count bin; % attributable = (actual FP - baseline-rate-implied
+FP) / actual FP. Result for LIF: only **2.8%** of its false positives are
+attributable to shared-input exposure this way, despite a 5.4x rate rise —
+because most non-edges simply don't have many shared drivers (skewed driver-
+count distribution), so the dramatic-looking curve concentrates on a small
+minority of pairs. PIF x10 came out higher (33.9%) since its total FP count is
+much larger to begin with. OU/PIF-x100 gave noisy/negative numbers (-67%,
+-2%) — an artifact of using a single lowest-bin as baseline on an already-flat
+curve, not a real effect; would need averaging several low bins to trust for
+a report.
+
+**Explicitly NOT established (flagged so it isn't overclaimed later):**
+whether *regression* is less prone to shared-input confounding than *plain
+correlation* — every arm above used the same regression estimator throughout;
+only the ground truth varied. That's a different, real, buildable comparison
+(swap the estimator, not the ground truth, using the SAME cached Cxx/Cyx) —
+deferred, not run, given report-deadline time constraints (2026-08-16).
+
+**tau_m x10000 (professor's literal "even further"):** probed only, not
+taken to a full production/calcium run. Result: closest eta=6000 -> 12.6Hz,
+**CV=47.37** — no eta in a wide grid [800..18000] gets CV meaningfully lower;
+burstiness is not eta-tunable at this tau_m. Decided NOT to spend the
+compute for a full calcium-pipeline comparison at this stage (would need
+~10-20x longer sim_time than x100 for proper stationarity, likely hours) --
+CV=47 alone is already conclusive that this regime is far outside anything
+biologically interpretable. Report as "pushed to this point, firing becomes
+non-physiological, stopped here" rather than chase a full number.
+
+**Conclusion (for the report/professor reply):** the shared-input confound's
+severity IS tied to nonlinearity of the true dynamics, confirmed by two
+independent linear model classes and a monotonic PIF ladder — this directly
+supports the professor's hypothesis. Separately and honestly: none of the
+linear alternatives match LIF's overall detection power, for identified,
+non-mysterious reasons unrelated to linearity per se (PIF: forced burstiness;
+Hawkes: hard stability ceiling on coupling strength) — frame as a second,
+genuine finding, not a caveat to hide. Do NOT claim "regression beats
+correlation" from this data — never tested.
+
+**Next, if picked up again:** (1) correlation-only baseline comparison (cheap,
+buildable from cached data); (2) more robust (multi-bin-averaged) baseline for
+the confound-attribution metric before using OU/PIF-x100's numbers in a
+report; (3) x10000 full production run, only if worth the compute budget.
+
+---

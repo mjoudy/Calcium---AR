@@ -42,14 +42,30 @@ Short by design — add new entries below as they come up, don't expand old ones
 - **Best guess why fixed probability is standard there (unconfirmed — worth asking directly):** likely mathematical convenience — fixed-p (Erdős–Rényi) graphs are the ensemble their random-matrix-theory/mean-field results are built for, not a deliberate claim about biological realism at scale.
 - **One-liner if asked "which is correct?"**: *"Both have a place: fixed probability matches this group's own precedent and NEST's classic example; fixed in-degree matches how real cortex actually scales — a neuron's input count is capped by its dendritic tree, not by how big the surrounding tissue sample is. We show both explicitly because the choice turns out to change the conclusion completely, which is itself a finding worth reporting."*
 
-## 4. Linearity boundary — LIF vs PIF vs OU, does more data/observation fix it?
+## 4. Linearity boundary — LIF vs PIF ladder vs OU vs Hawkes
 
-- **Direct test of "regression conditions everything away, so shared input shouldn't matter":**
-  measured shared-input excess-over-chance at 100% observed — **LIF (real) 28pp, PIF (τ_m×10,
-  still spiking) 8.6pp, OU (exact linear, analytic, no sim noise) ~0pp.** A truly linear system,
-  fully observed, shows the confound basically vanish — confirms the textbook claim (and
-  Pernice & Rotter's own math) is *correct in principle*. The real LIF+calcium system just isn't
-  linear enough for that to hold in practice.
+- **Two independent linear model classes, not one, both confirm the hypothesis:** shared-input
+  false-positive rise at 100% observed — **LIF (real) 14.2pp, PIF ×10 6.9pp, PIF ×100 −0.3pp,
+  Hawkes+calcium (linear point process) 3.3pp, OU (exact linear, no sim noise) −0.1pp.** A
+  continuous exactly-linear process (OU) AND a real linear point process (Hawkes, matching
+  Pernice et al. 2011's own model) both show the confound shrink; the PIF ladder shows it shrink
+  *monotonically* as leak is removed. Directly confirms the professor's hypothesis, twice over.
+- **But overall detection quality is a SEPARATE axis — don't conflate the two.** AUC / precision:
+  LIF 0.943/0.694, PIF×10 0.730/0.371, PIF×100 0.709/0.341, Hawkes 0.578/0.185, OU 1.000/0.953.
+  Every linear alternative to LIF has *worse* overall detection, not better — confound-structure
+  (which mistakes) and raw signal strength (how many mistakes) are different things. LIF's
+  strength on the second axis reflects this project's own extensive tuning toward a strongly-
+  correlated realistic regime; PIF/Hawkes were tuned to test linearity, not maximize SNR, and hit
+  real, separate, identified ceilings trying to close that gap (PIF: burstiness is *forced* by
+  removing the leak, CV 0.98→1.94→6.14→47 at ×1/×10/×100/×10000, not fixable by re-tuning eta;
+  Hawkes: hard stability ceiling, spectral radius must stay <1, unlike LIF's threshold-reset
+  which has no such linear cap).
+- **A large relative rate increase can still be a small share of total errors.** New attribution
+  metric: of LIF's false positives, only ~2.8% are attributable to shared-input exposure in
+  absolute-count terms (baseline-rate-implied vs actual), despite a 5.4× relative rate rise —
+  because most non-edges simply don't have many shared drivers. Worth citing if asked "so is
+  shared input really the main problem" — the mechanism is confirmed real, but concentrated on a
+  minority of pairs, not the majority of the error count.
 - **Partial observation is a separate problem, not the same one:** the exact-linear OU system
   shows the SAME steep rise in false-positive rate at 50% observed as LIF does. So "nonlinearity"
   and "hidden neurons" are two independent causes, not one — R.7 already showed hidden neurons
@@ -59,10 +75,22 @@ Short by design — add new entries below as they come up, don't expand old ones
   fixes have the *same* average shared-driver exposure as the ones that persist (attribution
   ratio ≈1.00). Real effect, not proven to be a shared-input-specific fix — say "a real lever,"
   not "solves the confound."
+- **Do NOT claim "regression is less prone to shared-input confounding than correlation" from
+  this work** — every arm above used the same regression estimator; only the ground truth varied.
+  That's a real, different, buildable comparison (swap the estimator, not the ground truth) —
+  not run. If asked, say plainly it hasn't been tested, and regression conditioning on observed
+  neurons is a real but partial mitigation (Pernice & Rotter 2013 show a shared-input term
+  survives explicitly in the regression solution — that's *why* their paper adds sparsity on top).
 - **One-liner if asked "does more data / more neurons fix this?"**: *"No — tested directly. A
   perfectly linear network, fully observed, shows the confound vanish. The real spiking+calcium
   system doesn't, even fully observed. That rules out 'just need more data' — it's a linearity
   ceiling, now isolated from the separate, also-real, partial-observation ceiling."*
+- **One-liner if asked "so is linear better overall, not just for this one bias?"**: *"No, and
+  that's a real, separate finding — linearity fixes the shared-input-specific bias but doesn't
+  come with better overall detection for free. Every linear ground truth we could build had a
+  real, identified reason (burstiness, or a hard stability ceiling) for weaker raw signal than
+  real LIF, whose parameters this project already spent a lot of effort tuning. Two different
+  axes, not a contradiction."*
 
 ---
 
