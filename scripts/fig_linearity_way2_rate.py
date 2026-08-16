@@ -34,7 +34,7 @@ DEFAULT_SOURCES = [
     ("OU (exact linear)", "~/calcium_results/ou_moments/n1250_linear", "#c0392b"),
     ("PIF pilot (tau_m x100)", "~/calcium_results/wrapup_n1250pif100_T100k/seed1",
      "#b8860b"),
-    ("Hawkes (linear, real spikes)", "~/calcium_results/hawkes_moments/n1250_calcium_tuned",
+    ("Hawkes (linear, real spikes)", "~/calcium_results/hawkes_moments/n1250_calcium_recal",
      "#2ca02c"),
 ]
 

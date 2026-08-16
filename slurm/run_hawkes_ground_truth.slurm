@@ -30,8 +30,8 @@
 #          sbatch slurm/run_hawkes_ground_truth.slurm
 #
 # Then, from your LOCAL machine:
-#   rsync -avhz fr_mj200@login1.nemo.uni-freiburg.de:'/work/classic/fr_mj200-calcium_ar/results/hawkes_moments/n1250_calcium_tuned/' \
-#     ~/calcium_results/hawkes_moments/n1250_calcium_tuned/
+#   rsync -avhz fr_mj200@login1.nemo.uni-freiburg.de:'/work/classic/fr_mj200-calcium_ar/results/hawkes_moments/n1250_calcium_recal/' \
+#     ~/calcium_results/hawkes_moments/n1250_calcium_recal/
 #   python scripts/fig_linearity_way2.py
 #
 # RECALIBRATED 2026-08-15: the first version (rate0=10Hz default, margin=0.3)
@@ -89,13 +89,21 @@ if [ -z "$ADJ" ]; then
 fi
 echo "using adj_true.npy: $ADJ"
 
+# margin=0.15 (rate0=26.73 to hit the same ~14.2Hz target), not the earlier
+# margin=0.30/rate0=24.3 -- a local spikes-only sweep (2026-08-16) found
+# margin=0.30 was NOT the best choice: precision fell going weaker (0.7 ->
+# 0.11-0.13) AND rose going stronger (0.15 -> 0.24, ~24% better than 0.30's
+# 0.195), plateauing around there (0.08 gave no further gain). Confound
+# suppression at 100% observed held up at the new setting (-0.2pp, still flat,
+# matches OU's -0.1pp) -- so this is a real improvement, not a different
+# trade-off. See scripts/hawkes_ground_truth.py's build_G for the margin math.
 "$PY" scripts/hawkes_ground_truth.py \
-  --adj "$ADJ" --out "$WS/hawkes_events/n1250_tuned" --sim-time 100000 \
-  --rate0 24.3 --margin 0.30 --seed 1
+  --adj "$ADJ" --out "$WS/hawkes_events/n1250_recal" --sim-time 100000 \
+  --rate0 26.73 --margin 0.15 --seed 1
 
 "$PY" scripts/hawkes_to_moments.py \
-  --events-dir "$WS/hawkes_events/n1250_tuned" \
-  --out "$WS/results/hawkes_moments/n1250_calcium_tuned" \
+  --events-dir "$WS/hawkes_events/n1250_recal" \
+  --out "$WS/results/hawkes_moments/n1250_calcium_recal" \
   --seed 1
   # chunk-ms left at the script default (10s, matches wrapup_run_stream.py's
   # own default) -- an earlier run here passed --chunk-ms 2000 as an extra RAM
