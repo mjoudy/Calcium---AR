@@ -52,6 +52,7 @@ from wrapup_run import build_cfg
 LAG_MS = 2.0
 SMOOTH_MS = 3.1
 AMP, SIG_IN, SIG_EX = 1.0, 0.01, 0.05
+CHUNK_MEM_BUDGET_BYTES = 400_000_000   # cap per-chunk (N, L) float32 array size
 
 # Fixed value held constant on the OTHER sweep, so each sweep changes exactly
 # one physical knob at a time:
@@ -101,7 +102,15 @@ def iter_calcium(idx, tms, N, dt, tau, T_ms, deconv, frame_ms, chunk, rng):
     zi = np.zeros((N, 1), np.float32)
     tau_est = [None]
     T_fine = int(T_ms / dt)
-    fine_chunk = chunk * r
+    # `chunk` is sized in OUTPUT (post-downsample) samples, so the fine-
+    # resolution array for one iteration is chunk*r samples wide -- fine for
+    # small r, but at a heavily downsampled camera (e.g. 33 ms -> r=330) that
+    # is chunk*r = 6.6M samples, i.e. a (N, 6.6M) float32 array (~33 GB at
+    # N=1250). Cap the FINE chunk directly at a fixed memory budget instead,
+    # independent of r: more (smaller) iterations at high r, same result,
+    # since the moment accumulation is exact regardless of chunking.
+    max_fine_chunk = max(r, CHUNK_MEM_BUDGET_BYTES // (max(N, 1) * 4))
+    fine_chunk = min(chunk * r, max_fine_chunk)
     t0 = 0
     while t0 < T_fine:
         t1 = min(t0 + fine_chunk, T_fine); L = t1 - t0
