@@ -32,6 +32,7 @@ Usage (cluster or local, N=1250 is cheap):
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -137,7 +138,8 @@ def accumulate(feed_iter, N, lag):
     return acc.snapshot()
 
 
-def run(kind, param, idx, tms, N, dt, adj, T_ms, chunk, rng_seed):
+def run(kind, param, idx, tms, N, dt, adj, T_ms, chunk, rng_seed,
+        fixed_cam_ms=FIXED_CAM_MS, fixed_tau_ms=FIXED_TAU_MS):
     """Returns (x_native, x_ratio, auc, corr).
 
     x_native is the ONE physical quantity this sweep actually varies (camera
@@ -145,6 +147,11 @@ def run(kind, param, idx, tms, N, dt, adj, T_ms, chunk, rng_seed):
     the primary, single-variable x-axis. x_ratio = eff_dt/tau is kept
     alongside it only for the secondary "does the ratio alone explain it?"
     collapse view.
+
+    fixed_cam_ms / fixed_tau_ms override the module-level defaults (33 ms /
+    100 ms) — e.g. to hold the camera at the idealised 0.1 ms used everywhere
+    else in this thesis instead of a "realistic" 33 ms, for a tau sweep that's
+    apples-to-apples with every other figure rather than a separate regime.
     """
     rng = np.random.default_rng(rng_seed)
     if kind == "spikes":
@@ -156,10 +163,10 @@ def run(kind, param, idx, tms, N, dt, adj, T_ms, chunk, rng_seed):
         if kind.endswith("tau"):
             # camera held FIXED at a realistic (not infinitely-fast) rate,
             # so we can sweep tau both above and below the camera's own dt.
-            tau = param; frame_ms = FIXED_CAM_MS; eff_dt = FIXED_CAM_MS
+            tau = param; frame_ms = fixed_cam_ms; eff_dt = fixed_cam_ms
             x_native = tau
         else:                                          # rate sweep, tau FIXED
-            tau = FIXED_TAU_MS; frame_ms = param; eff_dt = param
+            tau = fixed_tau_ms; frame_ms = param; eff_dt = param
             x_native = frame_ms
         lag = max(1, round(LAG_MS / eff_dt))
         Cxx, Cyx = accumulate(
@@ -188,6 +195,19 @@ def main():
                     default=[0.1, 0.5, 1, 2, 5, 10, 20, 33, 50, 100, 200, 500, 1000])
     ap.add_argument("--spike-bins", type=float, nargs="+",
                     default=[0.5, 1, 2, 5, 10, 20, 50])
+    ap.add_argument("--fixed-cam-ms", type=float, default=FIXED_CAM_MS,
+                    help="camera dt held fixed while tau is swept (default: "
+                         "33 ms, a realistic frame rate; pass 0.1 for the "
+                         "idealised camera used everywhere else in this thesis)")
+    ap.add_argument("--fixed-tau-ms", type=float, default=FIXED_TAU_MS,
+                    help="dye tau held fixed while camera dt is swept")
+    ap.add_argument("--resume", default=None,
+                    help="existing (possibly partial/interrupted) npz from a "
+                         "previous run of this script -- already-computed "
+                         "(kind, param) points are loaded and skipped rather "
+                         "than recomputed. Point (kind, param) identity only, "
+                         "not fixed-cam-ms/fixed-tau-ms -- only resume from a "
+                         "run that used the same fixed values.")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
 
@@ -203,26 +223,52 @@ def main():
     adj = net.get_adjacency(); np.fill_diagonal(adj, 0.0)
     N = adj.shape[0]
 
+    def checkpoint(out):
+        """Write whatever has been computed so far -- called after EVERY point,
+        not just at the end, so a killed/interrupted job (this sweep takes
+        ~1h and has twice been killed by the machine going unreachable
+        mid-run) never loses more than the point in flight."""
+        save = dict(net=args.net, N=N, T_ms=args.T_ms,
+                    fixed_tau_ms=args.fixed_tau_ms, fixed_cam_ms=args.fixed_cam_ms)
+        for k, v in out.items():
+            if not v:
+                continue
+            arr = np.array(sorted(v))
+            save[f"{k}_x"], save[f"{k}_ratio"] = arr[:, 0], arr[:, 1]
+            save[f"{k}_auc"], save[f"{k}_corr"] = arr[:, 2], arr[:, 3]
+        tmp = f"{args.out}.tmp.npz"
+        np.savez(tmp, **save)
+        os.replace(tmp, args.out)   # atomic: never leaves a half-written file
+
     out = {k: [] for k in ["spikes", "deconv_tau", "deconv_rate", "raw_tau", "raw_rate"]}
+    done = set()
+    if args.resume:
+        prev = np.load(args.resume, allow_pickle=False)
+        for k in out:
+            if f"{k}_x" not in prev.files:
+                continue
+            xs, rs, aucs, cs = (prev[f"{k}_x"], prev[f"{k}_ratio"],
+                               prev[f"{k}_auc"], prev[f"{k}_corr"])
+            for x, r, a, c in zip(xs, rs, aucs, cs):
+                out[k].append((float(x), float(r), float(a), float(c)))
+                done.add((k, round(float(x), 6)))
+        print(f"resumed {len(done)} points from {args.resume}", flush=True)
+
     plan = ([("spikes", b) for b in args.spike_bins]
             + [("deconv_tau", t) for t in args.taus]
             + [("raw_tau", t) for t in args.taus]
             + [("deconv_rate", f) for f in args.frames]
             + [("raw_rate", f) for f in args.frames])
+    plan = [(kind, p) for kind, p in plan if (kind, round(p, 6)) not in done]
     for kind, p in plan:
         x_native, x_ratio, auc, corr = run(
-            kind, p, idx, tms, N, dt, adj, args.T_ms, args.chunk, args.seed)
+            kind, p, idx, tms, N, dt, adj, args.T_ms, args.chunk, args.seed,
+            fixed_cam_ms=args.fixed_cam_ms, fixed_tau_ms=args.fixed_tau_ms)
         out[kind].append((x_native, x_ratio, auc, corr))
         print(f"  {kind:12s} param={p:<6g} x={x_native:.4g}  "
               f"(dt/tau={x_ratio:.4g})  AUC={auc:.3f}  corr={corr:.3f}", flush=True)
+        checkpoint(out)
 
-    save = dict(net=args.net, N=N, T_ms=args.T_ms,
-                fixed_tau_ms=FIXED_TAU_MS, fixed_cam_ms=FIXED_CAM_MS)
-    for k, v in out.items():
-        arr = np.array(sorted(v))
-        save[f"{k}_x"], save[f"{k}_ratio"] = arr[:, 0], arr[:, 1]
-        save[f"{k}_auc"], save[f"{k}_corr"] = arr[:, 2], arr[:, 3]
-    np.savez(args.out, **save)
     print(f"\nwrote {args.out}")
 
 
