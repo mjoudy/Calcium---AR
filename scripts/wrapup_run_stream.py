@@ -83,6 +83,12 @@ def main():
     ap.add_argument("--save-moments", action="store_true",
                     help="also save Cxx/Cyx per checkpoint (~2.5 GB at N=12500) so "
                          "new estimators can be solved in seconds without re-running")
+    ap.add_argument("--adjacency-file", default=None,
+                    help="use this FIXED (N,N) adjacency for every seed instead of "
+                         "generating a new random network -- --seeds then only drives "
+                         "the noise (Poisson input), not connectivity. For pooling "
+                         "several nodes' chunks into one long-recording estimate: same "
+                         "network, independent noise per node.")
     args = ap.parse_args()
 
     cfg = build_cfg(args.net)
@@ -102,7 +108,56 @@ def main():
     if cache:
         cache.mkdir(parents=True, exist_ok=True)
 
+    adj_override = np.load(args.adjacency_file) if args.adjacency_file else None
+
     for seed in args.seeds:
+        if adj_override is not None:
+            # Fixed connectivity, noise-only seed -- no ground-truth caching here,
+            # this path is for a one-off pooled-chunk run, not the seeded ladder.
+            print(f"[seed {seed}] building with FIXED adjacency from "
+                  f"{args.adjacency_file} -- seed drives noise only ...", flush=True)
+            net = BrunelNetwork(
+                n_excitatory=cfg["n_excitatory"], n_inhibitory=cfg["n_inhibitory"],
+                epsilon=cfg["epsilon"], g=cfg["g"], eta=cfg["eta"], J_ex=cfg["J_ex"],
+                delay=cfg["delay"], V_reset=cfg["V_reset"], tau_m=cfg.get("tau_m", 20.0),
+                sim_time=max_T, dt=dt, n_threads=cfg["n_threads"], seed=seed,
+                adjacency_override=adj_override)
+            net.build(); net.run(densify=False)
+            adj_true = net.get_adjacency()
+            assert np.allclose(adj_true, adj_override), \
+                "get_adjacency() != adjacency_override -- one_to_one replay bug"
+            spikes_cached = net.get_spike_events()
+            np.fill_diagonal(adj_true, 0.0)
+            print(f"[seed {seed}] streaming moments + checkpoints ...", flush=True)
+            cp_to_T = {int(round(T / dt)): T for T in args.sweep}
+
+            def save_checkpoint(cp, Cxx, Cyx, _seed=seed, _adj=adj_true):
+                T = cp_to_T[cp]
+                mats = solve_selected(Cxx, Cyx, cfg, args.methods)
+                outdir = Path(base) / "results" / f"{cfg['name']}_T{int(T)//1000}k" / f"seed{_seed}"
+                outdir.mkdir(parents=True, exist_ok=True)
+                np.save(outdir / "adj_true.npy", _adj.astype(np.float32))
+                for name, A in mats.items():
+                    np.save(outdir / f"A_{name}.npy", A.astype(np.float32))
+                if args.save_moments:
+                    np.save(outdir / "Cxx.npy", Cxx)
+                    np.save(outdir / "Cyx.npy", Cyx)
+                k0 = next(iter(mats))
+                print(f"[seed {_seed}] T={T:.0f}ms SAVED -> {outdir}  "
+                      f"|{k0}|max={np.abs(mats[k0]).max():.2e}", flush=True)
+
+            moments, tau_est, rate = stream_moments(
+                net, N=cfg["n_excitatory"] + cfg["n_inhibitory"], sim_time=max_T,
+                spike_events=spikes_cached, dt=dt, lag=lag, tau=cfg["tau"],
+                amplitude=cfg["amplitude"], sigma_intra=cfg["sigma_intra"],
+                sigma_extra=cfg["sigma_extra"], smooth_win=smooth_win,
+                tau_method=cfg["tau_method"], checkpoints_samples=checkpoints,
+                chunk_samples=chunk_samples, seed=seed, device=args.device,
+                on_checkpoint=save_checkpoint)
+            print(f"[seed {seed}] mean rate {rate:.1f} Hz  (all checkpoints saved)",
+                  flush=True)
+            continue
+
         # --- ground truth: reuse the cached simulation when we already have it ---
         # The key is a hash of EVERY parameter that determines the simulation, not
         # just the preset name: editing a preset in place must not silently reuse

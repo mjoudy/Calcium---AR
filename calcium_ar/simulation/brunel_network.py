@@ -66,6 +66,15 @@ class BrunelNetwork:
         Seed for NEST's random number generator. Together with n_threads this
         fully determines the network wiring and spike trains (NEST's RNG stream
         depends on the number of threads, so reproducibility needs both fixed).
+    adjacency_override : (N, N) ndarray or None
+        If given, SKIP the probabilistic recurrent wiring (fixed_indegree) and
+        instead build the EXACT connections in this matrix (adj[s, t] = weight
+        from source s to target t, 0-indexed, same convention as
+        get_adjacency()). `seed` then only drives the external Poisson noise
+        (and any other post-wiring randomness) -- it no longer touches
+        connectivity at all. Use this to run several independent noise
+        realizations of the SAME network (e.g. one chunk per compute node,
+        pooled afterward) instead of several different random networks.
     """
 
     def __init__(
@@ -85,6 +94,7 @@ class BrunelNetwork:
         dt: float = 0.1,
         n_threads: int = 1,
         seed: int = 42,
+        adjacency_override: np.ndarray | None = None,
     ):
         self.NE = n_excitatory
         self.NI = n_inhibitory
@@ -102,6 +112,7 @@ class BrunelNetwork:
         self.dt = dt
         self.n_threads = n_threads
         self.seed = seed
+        self.adjacency_override = adjacency_override
         if seed < 1:
             raise ValueError(
                 f"seed must be >= 1 (NEST's RNG seed range is 1..2^32-1); got {seed}"
@@ -168,16 +179,33 @@ class BrunelNetwork:
         nest.Connect(noise, self._nodes_in, syn_spec="excitatory")
 
         # Recurrent connections
-        nest.Connect(
-            self._nodes_ex, self._all_nodes,
-            conn_spec={"rule": "fixed_indegree", "indegree": self.CE},
-            syn_spec="excitatory",
-        )
-        nest.Connect(
-            self._nodes_in, self._all_nodes,
-            conn_spec={"rule": "fixed_indegree", "indegree": self.CI},
-            syn_spec="inhibitory",
-        )
+        if self.adjacency_override is not None:
+            # Exact replay of a fixed connectivity -- consumes NO randomness,
+            # so `seed` from here on only affects the Poisson noise below.
+            adj = np.asarray(self.adjacency_override)
+            if adj.shape != (self.N, self.N):
+                raise ValueError(
+                    f"adjacency_override shape {adj.shape} != ({self.N}, {self.N})")
+            src_idx, tgt_idx = np.nonzero(adj)
+            weights = adj[src_idx, tgt_idx]
+            base = int(self._all_nodes.tolist()[0])
+            # NEST allows non-unique IDs here ONLY as plain numpy arrays passed
+            # directly to Connect -- wrapping them in a NodeCollection (a SET)
+            # fails, since a presynaptic neuron legitimately repeats many times.
+            delays = np.full(len(weights), self.delay)
+            nest.Connect(base + src_idx, base + tgt_idx, "one_to_one",
+                         syn_spec={"weight": weights, "delay": delays})
+        else:
+            nest.Connect(
+                self._nodes_ex, self._all_nodes,
+                conn_spec={"rule": "fixed_indegree", "indegree": self.CE},
+                syn_spec="excitatory",
+            )
+            nest.Connect(
+                self._nodes_in, self._all_nodes,
+                conn_spec={"rule": "fixed_indegree", "indegree": self.CI},
+                syn_spec="inhibitory",
+            )
 
         # Spike recorder
         self._recorder = nest.Create("spike_recorder")
