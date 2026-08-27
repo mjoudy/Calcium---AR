@@ -128,7 +128,14 @@ def iter_calcium(idx, tms, N, dt, tau, T_ms, deconv, frame_ms, chunk, rng):
         if F.shape[1] == 0:
             t0 = t1; continue
         if not deconv:
-            yield F - F.mean(1, keepdims=True)
+            # NOT F - F.mean(1, keepdims=True): per-chunk local centering here
+            # silently detrends slow shared drift before MomentAccumulator does
+            # its own correct GLOBAL centering at snapshot time -- double
+            # centering that only ever touched this (raw) branch, not the
+            # deconvolved one, and not what stream_moments() (the actual
+            # production pipeline fig_preproc/fig_best use) does either. It was
+            # inflating the raw arm's correlation relative to the real method.
+            yield F
         else:
             if tau_est[0] is None:
                 tau_est[0] = estimate_tau_robust(F, window_length=win,
