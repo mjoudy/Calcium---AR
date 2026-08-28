@@ -109,7 +109,11 @@ def iter_calcium(idx, tms, N, dt, tau, T_ms, deconv, frame_ms, chunk, rng):
     # N=1250). Cap the FINE chunk directly at a fixed memory budget instead,
     # independent of r: more (smaller) iterations at high r, same result,
     # since the moment accumulation is exact regardless of chunking.
-    max_fine_chunk = max(r, CHUNK_MEM_BUDGET_BYTES // (max(N, 1) * 4))
+    # Also make sure each chunk yields enough POST-downsample samples for the
+    # smoothing window (win), not just >0 -- at a heavily downsampled camera
+    # (large r) a trailing/remainder chunk can otherwise end up with fewer
+    # output samples than win, which savgol_filter rejects outright.
+    max_fine_chunk = max(r * win, CHUNK_MEM_BUDGET_BYTES // (max(N, 1) * 4))
     fine_chunk = min(chunk * r, max_fine_chunk)
     t0 = 0
     while t0 < T_fine:
@@ -125,7 +129,11 @@ def iter_calcium(idx, tms, N, dt, tau, T_ms, deconv, frame_ms, chunk, rng):
         if r > 1:                                     # downsample (camera)
             nkeep = (F.shape[1] // r) * r
             F = F[:, :nkeep:r]
-        if F.shape[1] == 0:
+        if F.shape[1] < win:
+            # too few post-downsample samples for this chunk to smooth at all
+            # (only possible on a short trailing remainder) -- dropping it
+            # loses a negligible fraction of one (N, T) moment accumulation,
+            # not worth complicating the chunker to avoid.
             t0 = t1; continue
         if not deconv:
             # NOT F - F.mean(1, keepdims=True): per-chunk local centering here
