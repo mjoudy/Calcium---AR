@@ -239,6 +239,13 @@ def main():
                     default=[0.1, 0.5, 1, 2, 5, 10, 20, 33, 50, 100, 200, 500, 1000])
     ap.add_argument("--spike-bins", type=float, nargs="+",
                     default=[0.5, 1, 2, 5, 10, 20, 50])
+    ap.add_argument("--kinds", nargs="+",
+                    default=["spikes", "deconv_tau", "raw_tau", "deconv_rate", "raw_rate"],
+                    choices=["spikes", "deconv_tau", "raw_tau", "deconv_rate", "raw_rate"],
+                    help="restrict which of the 5 arms to run (default: all, "
+                         "matching every past use of this script) -- e.g. "
+                         "'--kinds spikes deconv_rate raw_rate' skips the slower "
+                         "tau sweep when only the camera-rate panel is wanted")
     ap.add_argument("--fixed-cam-ms", type=float, default=FIXED_CAM_MS,
                     help="camera dt held fixed while tau is swept (default: "
                          "33 ms, a realistic frame rate; pass 0.1 for the "
@@ -330,11 +337,11 @@ def main():
                 done.add((k, round(float(row[0]), 6)))
         print(f"resumed {len(done)} points from {args.resume}", flush=True)
 
-    plan = ([("spikes", b) for b in args.spike_bins]
-            + [("deconv_tau", t) for t in args.taus]
-            + [("raw_tau", t) for t in args.taus]
-            + [("deconv_rate", f) for f in args.frames]
-            + [("raw_rate", f) for f in args.frames])
+    plan = ([("spikes", b) for b in args.spike_bins if "spikes" in args.kinds]
+            + [("deconv_tau", t) for t in args.taus if "deconv_tau" in args.kinds]
+            + [("raw_tau", t) for t in args.taus if "raw_tau" in args.kinds]
+            + [("deconv_rate", f) for f in args.frames if "deconv_rate" in args.kinds]
+            + [("raw_rate", f) for f in args.frames if "raw_rate" in args.kinds])
     plan = [(kind, p) for kind, p in plan if (kind, round(p, 6)) not in done]
     for kind, p in plan:
         x_native, x_ratio, mets, A = run(
