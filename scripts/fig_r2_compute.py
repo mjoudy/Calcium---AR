@@ -2,8 +2,11 @@
 R.2 (calcium-observation section) — COMPUTE stage.
 
 From ONE simulation (sparse spikes), build five signal chains and score OLS on
-each with two measures (ROC-AUC + correlation), at a FIXED recording length so
-differences reflect the OBSERVATION, not the amount of data:
+each with the full connectivity metric set (ROC-AUC + correlation, both
+threshold-free, plus density-quantile precision / recall / F1 and the
+excitatory- vs inhibitory-source recall split -- see scripts/r2_metrics.py), at
+a FIXED recording length so differences reflect the OBSERVATION, not the amount
+of data:
 
   spikes        : regress on binned spike counts (no calcium) — the ceiling
   deconv_tau    : dye tau swept, camera FIXED at FIXED_CAM_MS -> deconvolve -> feed
@@ -24,6 +27,12 @@ visibly reach their floor/plateau instead of stopping mid-slope.
 
 Writes a small r2_data.npz (KB). Reuses cached spikes via --cache-dir if present.
 
+Also dumps the per-point OLS estimate A (float32 .npy) plus a _meta.npz
+(adj, n_exc) into <out-without-.npz>_estimates/ (disable with
+--no-save-estimates). scripts/fig_r2_rescore.py re-derives the metric set from
+those without re-running this ~1h sweep -- so adding / retuning a metric later
+is a seconds-long rescore, not a cluster job.
+
 Usage (cluster or local, N=1250 is cheap):
   python scripts/fig_r2_compute.py --net n1250ai --T-ms 100000 \
       --out $(ws_find calcium_ar)/results/fig_data/r2_data.npz
@@ -38,7 +47,6 @@ from pathlib import Path
 
 import numpy as np
 from scipy.signal import lfilter
-from sklearn.metrics import roc_auc_score
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT)); sys.path.insert(0, str(ROOT / "scripts"))
@@ -47,7 +55,10 @@ from calcium_ar.preprocessing.signal_utils import smooth_signal
 from calcium_ar.preprocessing.tau_estimation import estimate_tau_robust
 from calcium_ar.experiments.streaming import MomentAccumulator
 from calcium_ar.solvers.from_moments import ols_from_moments
+from r2_metrics import METRICS, metrics_from_A
 from wrapup_run import build_cfg
+
+DENSITY = 0.10   # operating-point density for precision/recall/F1 (~Brunel epsilon)
 
 LAG_MS = 2.0
 SMOOTH_MS = 3.1
@@ -66,12 +77,12 @@ def smooth_win(eff_dt):
     return w if w % 2 == 1 else w + 1
 
 
-def score(Cxx, Cyx, adj):
+def score(Cxx, Cyx, adj, n_exc, density=DENSITY):
+    """Solve OLS from the moments, then score the estimate. Returns (A, mets)
+    where mets is a dict keyed by scripts/r2_metrics.METRICS. A is handed back
+    so the caller can dump it for later rescoring."""
     A = ols_from_moments(Cxx, Cyx)
-    N = A.shape[0]; m = ~np.eye(N, dtype=bool)
-    g = adj.T[m].ravel(); a = A[m].ravel()
-    return (float(roc_auc_score((g != 0).astype(int), np.abs(a))),
-            float(np.corrcoef(a, g)[0, 1]))
+    return A, metrics_from_A(A, adj, n_exc, density)
 
 
 # --------------------------------------------------------------------------- #
@@ -91,9 +102,15 @@ def iter_spike_bin(idx, tms, N, bin_ms, T_ms, chunk):
         t0 = t1
 
 
-def iter_calcium(idx, tms, N, dt, tau, T_ms, deconv, frame_ms, chunk, rng):
+def iter_calcium(idx, tms, N, dt, tau, T_ms, deconv, frame_ms, chunk, rng, phase=0):
     """Fine calcium via AR(1); optional downsample to frame_ms; optional deconv.
-    Yields feed columns at eff_dt = frame_ms (or dt)."""
+    Yields feed columns at eff_dt = frame_ms (or dt).
+
+    phase (in FINE samples, 0 <= phase < r): which fine sample the camera's
+    first kept frame lands on, e.g. phase=0 is "starts at t=0" (the original,
+    only behaviour before this was added), phase=1 is "starts 1 fine-dt
+    later", etc. Used to check whether the dropped in-between samples carry
+    extra information when reused (see docs/experiments/notebook.md)."""
     eff_dt = frame_ms if frame_ms else dt
     r = max(1, int(round(eff_dt / dt)))               # downsample factor
     win = smooth_win(eff_dt)
@@ -127,8 +144,11 @@ def iter_calcium(idx, tms, N, dt, tau, T_ms, deconv, frame_ms, chunk, rng):
         C, zi = lfilter(b, a, inp, axis=1, zi=zi)
         F = C + rng.standard_normal((N, L), dtype=np.float32) * np.float32(SIG_EX)
         if r > 1:                                     # downsample (camera)
-            nkeep = (F.shape[1] // r) * r
-            F = F[:, :nkeep:r]
+            # phase-correct across chunk boundaries even when a chunk length
+            # isn't a multiple of r: convert the GLOBAL phase into this
+            # chunk's LOCAL starting offset.
+            start_local = (phase - t0) % r
+            F = F[:, start_local::r]
         if F.shape[1] < win:
             # too few post-downsample samples for this chunk to smooth at all
             # (only possible on a short trailing remainder) -- dropping it
@@ -162,9 +182,9 @@ def accumulate(feed_iter, N, lag):
     return acc.snapshot()
 
 
-def run(kind, param, idx, tms, N, dt, adj, T_ms, chunk, rng_seed,
-        fixed_cam_ms=FIXED_CAM_MS, fixed_tau_ms=FIXED_TAU_MS):
-    """Returns (x_native, x_ratio, auc, corr).
+def run(kind, param, idx, tms, N, dt, adj, T_ms, chunk, rng_seed, n_exc,
+        density=DENSITY, fixed_cam_ms=FIXED_CAM_MS, fixed_tau_ms=FIXED_TAU_MS):
+    """Returns (x_native, x_ratio, mets, A) — mets keyed by r2_metrics.METRICS.
 
     x_native is the ONE physical quantity this sweep actually varies (camera
     frame interval in ms for a rate sweep, dye tau in ms for a tau sweep) —
@@ -196,8 +216,8 @@ def run(kind, param, idx, tms, N, dt, adj, T_ms, chunk, rng_seed,
         Cxx, Cyx = accumulate(
             iter_calcium(idx, tms, N, dt, tau, T_ms, deconv, frame_ms, chunk, rng), N, lag)
         x_ratio = eff_dt / tau
-    auc, corr = score(Cxx, Cyx, adj)
-    return x_native, x_ratio, auc, corr
+    A, mets = score(Cxx, Cyx, adj, n_exc, density)
+    return x_native, x_ratio, mets, A
 
 
 def main():
@@ -232,6 +252,19 @@ def main():
                          "than recomputed. Point (kind, param) identity only, "
                          "not fixed-cam-ms/fixed-tau-ms -- only resume from a "
                          "run that used the same fixed values.")
+    ap.add_argument("--density", type=float, default=DENSITY,
+                    help="operating-point density for precision / recall / F1 / "
+                         "recall_exc / recall_inh: the top `density` fraction of "
+                         "|A| off-diagonal entries count as predicted edges "
+                         "(default 0.10 ~ true Brunel epsilon)")
+    ap.add_argument("--est-dir", default=None,
+                    help="directory for the per-point OLS estimate A (float32 "
+                         ".npy) + a _meta.npz (adj, n_exc), used by "
+                         "fig_r2_rescore.py to add / retune a metric without "
+                         "re-running this sweep. Default: "
+                         "<out-without-.npz>_estimates/")
+    ap.add_argument("--no-save-estimates", action="store_true",
+                    help="skip the per-point A dump (~6 MB/point at N=1250)")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
 
@@ -246,20 +279,36 @@ def main():
     idx = idx.astype(np.int64)
     adj = net.get_adjacency(); np.fill_diagonal(adj, 0.0)
     N = adj.shape[0]
+    n_exc = int(cfg["n_excitatory"])
+
+    if args.no_save_estimates:
+        est_dir = None
+    elif args.est_dir:
+        est_dir = Path(args.est_dir)
+    else:
+        stem = Path(args.out).with_suffix("")
+        est_dir = stem.parent / f"{stem.name}_estimates"
+    if est_dir is not None:
+        est_dir.mkdir(parents=True, exist_ok=True)
+        np.savez(est_dir / "_meta.npz", adj=adj.astype(np.float32),
+                 n_exc=n_exc, N=N, net=args.net, density=args.density)
+        print(f"per-point estimates -> {est_dir}", flush=True)
 
     def checkpoint(out):
         """Write whatever has been computed so far -- called after EVERY point,
         not just at the end, so a killed/interrupted job (this sweep takes
         ~1h and has twice been killed by the machine going unreachable
         mid-run) never loses more than the point in flight."""
-        save = dict(net=args.net, N=N, T_ms=args.T_ms,
+        save = dict(net=args.net, N=N, T_ms=args.T_ms, density=args.density,
+                    metrics=np.array(METRICS),
                     fixed_tau_ms=args.fixed_tau_ms, fixed_cam_ms=args.fixed_cam_ms)
         for k, v in out.items():
             if not v:
                 continue
-            arr = np.array(sorted(v))
+            arr = np.array(sorted(v))          # rows: (x, ratio, *METRICS)
             save[f"{k}_x"], save[f"{k}_ratio"] = arr[:, 0], arr[:, 1]
-            save[f"{k}_auc"], save[f"{k}_corr"] = arr[:, 2], arr[:, 3]
+            for i, mn in enumerate(METRICS):
+                save[f"{k}_{mn}"] = arr[:, 2 + i]
         tmp = f"{args.out}.tmp.npz"
         np.savez(tmp, **save)
         os.replace(tmp, args.out)   # atomic: never leaves a half-written file
@@ -271,11 +320,14 @@ def main():
         for k in out:
             if f"{k}_x" not in prev.files:
                 continue
-            xs, rs, aucs, cs = (prev[f"{k}_x"], prev[f"{k}_ratio"],
-                               prev[f"{k}_auc"], prev[f"{k}_corr"])
-            for x, r, a, c in zip(xs, rs, aucs, cs):
-                out[k].append((float(x), float(r), float(a), float(c)))
-                done.add((k, round(float(x), 6)))
+            xs, rs = prev[f"{k}_x"], prev[f"{k}_ratio"]
+            # tolerate a resume npz from before a metric was added: missing
+            # column -> NaN, so the point still counts as done and is skipped.
+            cols = [prev[f"{k}_{mn}"] if f"{k}_{mn}" in prev.files
+                    else np.full(len(xs), np.nan) for mn in METRICS]
+            for row in zip(xs, rs, *cols):
+                out[k].append(tuple(float(v) for v in row))
+                done.add((k, round(float(row[0]), 6)))
         print(f"resumed {len(done)} points from {args.resume}", flush=True)
 
     plan = ([("spikes", b) for b in args.spike_bins]
@@ -285,12 +337,17 @@ def main():
             + [("raw_rate", f) for f in args.frames])
     plan = [(kind, p) for kind, p in plan if (kind, round(p, 6)) not in done]
     for kind, p in plan:
-        x_native, x_ratio, auc, corr = run(
+        x_native, x_ratio, mets, A = run(
             kind, p, idx, tms, N, dt, adj, args.T_ms, args.chunk, args.seed,
+            n_exc, density=args.density,
             fixed_cam_ms=args.fixed_cam_ms, fixed_tau_ms=args.fixed_tau_ms)
-        out[kind].append((x_native, x_ratio, auc, corr))
+        out[kind].append((x_native, x_ratio) + tuple(mets[mn] for mn in METRICS))
+        if est_dir is not None:
+            np.save(est_dir / f"{kind}_{p:g}.npy", A.astype(np.float32))
         print(f"  {kind:12s} param={p:<6g} x={x_native:.4g}  "
-              f"(dt/tau={x_ratio:.4g})  AUC={auc:.3f}  corr={corr:.3f}", flush=True)
+              f"(dt/tau={x_ratio:.4g})  AUC={mets['auc']:.3f} corr={mets['corr']:.3f} "
+              f"P={mets['precision']:.3f} R={mets['recall']:.3f} "
+              f"Rexc={mets['recall_exc']:.3f} Rinh={mets['recall_inh']:.3f}", flush=True)
         checkpoint(out)
 
     print(f"\nwrote {args.out}")
