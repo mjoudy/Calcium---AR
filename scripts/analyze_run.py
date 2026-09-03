@@ -31,7 +31,23 @@ sys.path.insert(0, str(ROOT))
 
 FIELDS = ["run", "seed", "method", "n_scored", "sampled", "true_density",
           "corr", "roc_auc", "pr_ap", "auc_E", "auc_I",
-          "E_rec", "E_prec", "I_rec", "I_prec", "none_rec"]
+          "E_rec", "E_prec", "I_rec", "I_prec", "none_rec",
+          "mcc3", "mcc_pres", "mcc_E", "mcc_I", "mcc_type", "mcc_neuron"]
+
+
+def _mcc2(tp, tn, fp, fn):
+    """Binary Matthews correlation from 2x2 counts (0 if a margin is empty)."""
+    tp, tn, fp, fn = float(tp), float(tn), float(fp), float(fn)
+    den = np.sqrt(tp + fp) * np.sqrt(tp + fn) * np.sqrt(tn + fp) * np.sqrt(tn + fn)
+    return 0.0 if den == 0 else (tp * tn - fp * fn) / den
+
+
+def _mcc_kclass(C):
+    """Gorodkin R_K (multiclass MCC) from a KxK confusion, rows=true, cols=pred."""
+    C = C.astype(np.float64)
+    t, p, s, c = C.sum(1), C.sum(0), C.sum(), np.trace(C)
+    den = np.sqrt((s * s - p @ p) * (s * s - t @ t))
+    return 0.0 if den == 0 else (c * s - t @ p) / den
 
 
 def edge_index(N, sample, rng):
@@ -66,6 +82,26 @@ def score(a, g, density):
     out["I_rec"] = float((pI & yI).sum() / max(yI.sum(), 1))
     out["I_prec"] = float((pI & yI).sum() / max(pI.sum(), 1))
     out["none_rec"] = float(((~conn) & (~yc)).sum() / max((~yc).sum(), 1))
+
+    # --- MCC family, same operating point (rows/cols order E:+1, none:0, I:-1) - #
+    yt = np.sign(g).astype(np.int8)
+    yp = np.where(conn, np.sign(a), 0).astype(np.int8)
+    C = np.zeros((3, 3))
+    for ri, tc in enumerate((1, 0, -1)):
+        for ci, pc in enumerate((1, 0, -1)):
+            C[ri, ci] = np.sum((yt == tc) & (yp == pc))
+
+    def _ovr(k):                                        # class k vs the rest
+        tp = C[k, k]; fn = C[k, :].sum() - tp
+        fp = C[:, k].sum() - tp; tn = C.sum() - tp - fn - fp
+        return _mcc2(tp, tn, fp, fn)
+
+    out["mcc3"] = _mcc_kclass(C)                        # 3-class E / none / I
+    out["mcc_pres"] = _mcc2(C[0, 0] + C[0, 2] + C[2, 0] + C[2, 2],   # edge vs none
+                            C[1, 1], C[1, 0] + C[1, 2], C[0, 1] + C[2, 1])
+    out["mcc_E"] = _ovr(0)                              # excitatory vs rest
+    out["mcc_I"] = _ovr(2)                              # inhibitory vs rest
+    out["mcc_type"] = _mcc2(C[0, 0], C[2, 2], C[2, 0], C[0, 2])      # E vs I | detected
     return out
 
 
@@ -92,22 +128,32 @@ def main():
         i, j, sampled = edge_index(N, args.sample, rng)
         # convention: A[i,j] is compared against adj.T[i,j] = adj[j,i]
         g = np.asarray(adj[j, i], dtype=np.float64)
+        # per-neuron true type from full out-degree (axon = row in adj_true)
+        type_true = np.sign(np.asarray(adj.sum(1), dtype=np.float64))
         del adj; gc.collect()
         true_density = float((g != 0).mean())
+        has_out = type_true != 0
 
         for f in sorted(sd.glob("A_*.npy")):
             method = f.stem[2:]
             A = np.load(f, mmap_mode="r")
             a = np.asarray(A[i, j], dtype=np.float64)
+            # per-neuron inferred type from full out-strength (axon = column in A)
+            type_est = np.sign(np.asarray(A.sum(0), dtype=np.float64))
             del A; gc.collect()
             r = score(a, g, args.density)
+            tp = int(((type_est == 1) & (type_true == 1) & has_out).sum())
+            fn = int(((type_est != 1) & (type_true == 1) & has_out).sum())
+            fp = int(((type_est == 1) & (type_true == -1) & has_out).sum())
+            tn = int(((type_est != 1) & (type_true == -1) & has_out).sum())
+            r["mcc_neuron"] = _mcc2(tp, tn, fp, fn)
             r.update(run=data.name, seed=sd.name, method=method,
                      n_scored=len(g), sampled=int(sampled),
                      true_density=round(true_density, 5))
             rows.append(r)
             print(f"[{sd.name}] {method:9s} AUC={r['roc_auc']:.3f} "
-                  f"AUC_E={r['auc_E']:.3f} AUC_I={r['auc_I']:.3f} "
-                  f"E_rec={r['E_rec']:.3f} I_rec={r['I_rec']:.3f} corr={r['corr']:.3f}",
+                  f"E_rec={r['E_rec']:.3f} I_rec={r['I_rec']:.3f} corr={r['corr']:.3f} "
+                  f"MCC3={r['mcc3']:.3f} MCC_E={r['mcc_E']:.3f} MCC_I={r['mcc_I']:.3f}",
                   flush=True)
             del a; gc.collect()
         del g; gc.collect()
